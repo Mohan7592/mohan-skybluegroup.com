@@ -1,0 +1,3007 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Project workspace API for the Pitch Intelligence Workspace
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: projects
+    description: Pitch project workspace operations
+  - name: conversations
+    description: Persistent project Copilot conversations
+  - name: intelligence
+    description: Source-aware project intelligence and research status
+  - name: inventory
+    description: Imported media inventory, location data and project selections
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [projects]
+      summary: Get dashboard summary and recent projects
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /brand-options:
+    post:
+      operationId: getBrandOptions
+      tags: [projects]
+      summary: Suggest source-backed companies, brands and categories
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BrandOptionsInput"
+      responses:
+        "200":
+          description: First-party, source-backed options (may be empty)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BrandOptionsResponse"
+        "400":
+          description: Invalid query
+        "502":
+          description: Live suggestion search or extraction failed
+        "503":
+          description: Live suggestions are not configured
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List pitch projects
+      responses:
+        "200":
+          description: Pitch projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PitchProject"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a pitch project for a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created pitch project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PitchProject"
+        "503":
+          description: Project was saved but selected-brand research could not be queued; response includes projectId and a recovery action
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  projectId: { type: string, format: uuid }
+                  recovery:
+                    type: object
+                    properties:
+                      method: { type: string, enum: [POST] }
+                      path: { type: string }
+                      note: { type: string }
+                    required: [method, path, note]
+                required: [error, projectId, recovery]
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a pitch project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Pitch project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PitchProject"
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update project details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated pitch project
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PitchProject"
+  /projects/{id}/workspace:
+    get:
+      operationId: getProjectWorkspace
+      tags: [projects]
+      summary: Get the project and overview placeholders
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Project workspace overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectWorkspace"
+  /projects/{id}/conversation:
+    get:
+      operationId: getProjectConversation
+      tags: [conversations]
+      summary: Get persistent project Copilot conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Conversation thread
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConversationThread"
+  /projects/{id}/intelligence:
+    get:
+      operationId: getProjectIntelligence
+      tags: [intelligence]
+      summary: Get stored intelligence and evidence for a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Intelligence workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectIntelligence"
+  /projects/{id}/research/refresh:
+    post:
+      operationId: refreshProjectResearch
+      tags: [intelligence]
+      summary: Start a new persistent research run; brand confirmation is required
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "202":
+          description: Research run created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResearchRunDetails"
+        "503":
+          description: Live research provider is not configured
+  /projects/{id}/research/runs:
+    get:
+      operationId: listProjectResearchRuns
+      tags: [intelligence]
+      summary: List historical and current research runs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Research runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ResearchRunDetails" }
+  /projects/{id}/research/runs/{runId}:
+    get:
+      operationId: getProjectResearchRun
+      tags: [intelligence]
+      summary: Get progress, brand candidates, and competitor review for a run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Research run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchRunDetails" }
+  /projects/{id}/research/runs/{runId}/confirm-brand:
+    post:
+      operationId: confirmResearchBrand
+      tags: [intelligence]
+      summary: Confirm an identified brand before continuing research
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BrandConfirmationInput" }
+      responses:
+        "200":
+          description: Confirmed brand and resumed run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchRunDetails" }
+  /projects/{id}/research/runs/{runId}/competitors:
+    put:
+      operationId: confirmResearchCompetitors
+      tags: [intelligence]
+      summary: Add or remove market-specific competitors and continue
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompetitorSelectionInput" }
+      responses:
+        "200":
+          description: Competitors confirmed and run resumed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchRunDetails" }
+  /projects/{id}/research/runs/{runId}/deep-research:
+    post:
+      operationId: startDeepResearch
+      tags: [intelligence]
+      summary: Start optional competitor and strategy research after a pitch-focused run
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: runId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Linked deep research run queued; competitor confirmation may be required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchRunDetails" }
+        "404": { description: Project or run not found }
+        "409": { description: Active run or invalid starting state }
+  /projects/{id}/research/runs/{runId}/retry:
+    post:
+      operationId: retryResearchStages
+      tags: [intelligence]
+      summary: Retry failed or limited-evidence sections without deleting history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ResearchRetryInput" }
+      responses:
+        "200":
+          description: Sections queued for retry
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ResearchRunDetails" }
+  /projects/{id}/claims/{claimId}/review:
+    post:
+      operationId: reviewResearchClaim
+      tags: [intelligence]
+      summary: Append an auditable human review of a claim
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: claimId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ClaimReviewInput" }
+      responses:
+        "201":
+          description: Review appended
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ClaimReview" }
+        "400": { description: Invalid review input }
+        "404": { description: Project or claim not found }
+        "422": { description: Additional source could not be safely verified }
+  /projects/{id}/claims/{claimId}/reviews:
+    get:
+      operationId: listResearchClaimReviews
+      tags: [intelligence]
+      summary: Get append-only claim review history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: claimId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Review history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ClaimReview" }
+        "404": { description: Project or claim not found }
+  /projects/{id}/messages:
+    post:
+      operationId: sendProjectMessage
+      tags: [conversations]
+      summary: Save a message and receive a grounded AI answer or explicit saved-context fallback
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageInput"
+      responses:
+        "201":
+          description: Saved message pair
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePair"
+  /inventory/assets:
+    get:
+      operationId: listInventoryAssets
+      tags: [inventory]
+      summary: Search and filter imported inventory assets
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: assetType, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: area, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: road, in: query, schema: { type: string, maxLength: 160 } }
+        - { name: availability, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: route, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: displayTechnology, in: query, schema: { type: string, enum: [static, digital] } }
+        - { name: client, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: bookingStatus, in: query, schema: { type: string, maxLength: 80 } }
+        - { name: sourceFamily, in: query, schema: { type: string, enum: [BUS_SHELTER, BUS, MANUAL, FUTURE] } }
+        - { name: shelterConfiguration, in: query, schema: { type: string, enum: [SINGLE, DOUBLE] } }
+        - { name: sourceMediaType, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: mediaUnit, in: query, schema: { type: string, enum: [STATIC_TOP_PANEL, DIGITAL_TOP_PANEL, STATIC_MUPI, DIGITAL_MUPI] } }
+        - { name: powerStatus, in: query, schema: { type: string, maxLength: 100 } }
+        - { name: accountability, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: tentativeClient, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: lifecycleStatus, in: query, schema: { type: string, enum: [ACTIVE, REMOVED, MISSING_FROM_SOURCE] } }
+        - { name: coordinateState, in: query, schema: { type: string, enum: [VALID, MISSING_OR_INVALID_COORDINATES] } }
+        - { name: includeInactive, in: query, schema: { type: boolean, default: false } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: Inventory page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryAssetPage" }
+  /inventory/assets/{id}:
+    get:
+      operationId: getInventoryAsset
+      tags: [inventory]
+      summary: Get one inventory asset
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Inventory asset
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryAsset" }
+        "404": { description: Asset not found }
+  /inventory/imports/preview:
+    post:
+      operationId: previewInventoryImport
+      tags: [inventory]
+      summary: Validate structured rows and preview import actions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryImportInput" }
+      responses:
+        "200":
+          description: Validated import preview
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryImportPreview" }
+        "400": { description: Invalid mapping or request rows }
+  /inventory/imports:
+    get:
+      operationId: listInventoryImports
+      tags: [inventory]
+      summary: List committed inventory import history
+      responses:
+        "200":
+          description: Import batches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InventoryImportBatch" }
+    post:
+      operationId: commitInventoryImport
+      tags: [inventory]
+      summary: Revalidate and atomically commit explicit import choices
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InventoryImportCommitInput" }
+      responses:
+        "201":
+          description: Import committed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryImportBatch" }
+        "400": { description: Import validation failed or choices incomplete }
+        "409": { description: Inventory changed since preview; preview again }
+  /inventory/quality-summary:
+    get:
+      operationId: getInventoryQualitySummary
+      tags: [inventory]
+      summary: Derive inventory data quality states from stored fields
+      responses:
+        "200":
+          description: Quality state counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventoryQualitySummary" }
+  /inventory/nearby:
+    get:
+      operationId: findNearbyInventoryAssets
+      tags: [inventory]
+      summary: Find coordinate-backed inventory within a straight-line radius
+      parameters:
+        - { name: latitude, in: query, required: true, schema: { type: number, minimum: -90, maximum: 90 } }
+        - { name: longitude, in: query, required: true, schema: { type: number, minimum: -180, maximum: 180 } }
+        - { name: thresholdMeters, in: query, required: true, schema: { type: integer, enum: [250, 500, 1000, 2000] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: Nearby coordinate-backed assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NearbyInventoryAsset" }
+  /inventory/sync/status:
+    get:
+      operationId: getInventorySyncStatus
+      tags: [inventory]
+      summary: Read configured source and last sync without making a Sheets request
+      responses:
+        "200":
+          description: Source connection and sync status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventorySyncStatus" }
+  /inventory/sync:
+    post:
+      operationId: runInventorySync
+      tags: [inventory]
+      summary: Synchronize Single and Double shelter tabs from the configured live Google Sheet
+      responses:
+        "200":
+          description: Completed sync run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventorySyncRun" }
+        "409": { description: Sync already running or source not configured }
+        "502": { description: Google Sheets read failed; no partial inventory changes committed }
+  /inventory/sync/history:
+    get:
+      operationId: listInventorySyncHistory
+      tags: [inventory]
+      summary: Recent inventory sync runs and changes
+      responses:
+        "200":
+          description: Sync history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InventorySyncRun" }
+  /inventory/sync/health:
+    get:
+      operationId: getInventorySourceHealth
+      tags: [inventory]
+      summary: Source QA, distribution and last run comparison
+      responses:
+        "200":
+          description: Inventory source health
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InventorySourceHealth" }
+  /inventory/sync/conflicts:
+    get:
+      operationId: getShelterSyncConflicts
+      tags: [inventory]
+      summary: Inspect shelter source rows quarantined for duplicate identity conflicts
+      responses:
+        "200":
+          description: Shelter sync source conflicts
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ShelterSyncConflict" }
+  /inventory/bus-routes:
+    get:
+      operationId: listBusRoutes
+      tags: [inventory]
+      summary: Search and page distinct bus route references and their source variants
+      parameters:
+        - { name: search, in: query, schema: { type: string, maxLength: 200 } }
+        - { name: depot, in: query, schema: { type: string, maxLength: 160 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0, maximum: 1000000, default: 0 } }
+      responses:
+        "200":
+          description: Bus route reference page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusRoutePage" }
+  /inventory/bus-routes/health:
+    get:
+      operationId: getBusRoutesHealth
+      tags: [inventory]
+      summary: Summarize active route variants, data gaps, missing routes, and the last source sync
+      responses:
+        "200":
+          description: Bus route reference data health
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusRoutesHealth" }
+  /inventory/bus-routes/{routeId}:
+    get:
+      operationId: getBusRoute
+      tags: [inventory]
+      summary: Get a distinct route and all active source-row variants
+      parameters:
+        - { name: routeId, in: path, required: true, schema: { type: string, maxLength: 160 } }
+      responses:
+        "200":
+          description: Bus route reference and source variants
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusRouteDetail" }
+        "404": { description: Route not found }
+  /inventory/bus-routes/status:
+    get:
+      operationId: getBusRoutesStatus
+      tags: [inventory]
+      summary: Read bus route source connection and sync status
+      responses:
+        "200":
+          description: Bus route source connection and sync status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusRoutesStatus" }
+  /inventory/bus-routes/sync:
+    post:
+      operationId: syncBusRoutes
+      tags: [inventory]
+      summary: Synchronize distinct route references from all visible source tabs
+      responses:
+        "200":
+          description: Bus route sync run
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusRouteSyncRun" }
+        "409": { description: Source is not configured or sync already running }
+        "502": { description: Google Sheets read failed; no partial route changes committed }
+  /inventory/passenger-metrics/upload-url:
+    post:
+      operationId: createPassengerMetricUploadUrl
+      tags: [inventory]
+      summary: Create a short-lived private App Storage upload for a passenger ridership CSV
+      description: The returned opaque object path is private and is only usable by the authenticated import workflow; no public object-serving URL is provided.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PassengerCsvUploadInput" }
+      responses:
+        "200":
+          description: Short-lived signed upload URL and private object path
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerCsvUpload" }
+        "400":
+          description: Invalid file metadata or file size
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "503":
+          description: Private App Storage is unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /inventory/passenger-metrics/uploads:
+    delete:
+      operationId: deletePassengerMetricUpload
+      tags: [inventory]
+      summary: Delete an abandoned or rejected private passenger CSV upload
+      description: Imported source objects are retained for audit and cannot be deleted here.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PassengerCsvUploadDeleteInput" }
+      responses:
+        "204": { description: Private temporary source object deleted }
+        "400":
+          description: Invalid private object path
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: Imported source objects are retained for audit
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "503":
+          description: Private source object could not be removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /inventory/passenger-metrics/preview:
+    post:
+      operationId: previewPassengerMetricImport
+      tags: [inventory]
+      summary: Validate and preview route/month passenger CSV rows against active route variants
+      description: Reads the uploaded private object, validates route ridership columns and mapping choices, and returns only source row values needed for review. Invalid or non-ridership sources are removed rather than retained.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PassengerMetricImportInput" }
+      responses:
+        "200":
+          description: Validated rows with conservative route-variant mappings and import quality summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerMetricImportPreview" }
+        "400":
+          description: Invalid import metadata or unreadable CSV
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: The private source object has already been imported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "422":
+          description: The CSV contains invalid metric rows or no usable passenger rows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerMetricPreviewError" }
+  /inventory/passenger-metrics/import:
+    post:
+      operationId: importPassengerMetrics
+      tags: [inventory]
+      summary: Import normalized route/month passenger evidence from a private CSV
+      description: Preserves the original CSV in private App Storage and records original row values, source row numbers and conservative route-variant mapping status. Passenger metrics remain route-level ridership evidence, not impressions, reach or vehicle availability.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PassengerMetricImportInput" }
+      responses:
+        "201":
+          description: Passenger import batch and mapping/quality counts
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerMetricImportResult" }
+        "400":
+          description: Invalid import metadata or no importable rows
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: The private source object has already been imported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "422":
+          description: Invalid passenger metric rows; no records were imported
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerMetricImportError" }
+  /inventory/passenger-metrics/imports:
+    get:
+      operationId: listPassengerMetricImports
+      tags: [inventory]
+      summary: List passenger metric import batches and route mapping counts
+      responses:
+        "200":
+          description: Recent passenger import history
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PassengerMetricImportHistoryItem" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /inventory/passenger-metrics:
+    get:
+      operationId: listPassengerMetrics
+      tags: [inventory]
+      summary: List normalized monthly passenger records and their route-variant mapping provenance
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Maximum returned rows; runtime clamps this value to 1–1000 and defaults to 250.
+          schema: { type: integer, default: 250 }
+      responses:
+        "200":
+          description: Recent normalized route/month ridership records
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PassengerRouteMetric" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /inventory/passenger-metrics/{metricId}/mapping:
+    put:
+      operationId: mapPassengerMetricRouteVariant
+      tags: [inventory]
+      summary: Confirm a candidate route-variant mapping for an ambiguous or unmatched passenger metric
+      description: A selected variant must already be among the source row's candidates. Rows that do not identify a specific variant cannot be assigned across multiple route variants.
+      parameters:
+        - { name: metricId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PassengerMetricMappingInput" }
+      responses:
+        "200":
+          description: Passenger metric with the confirmed source route mapping
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PassengerRouteMetricMappingResult" }
+        "400":
+          description: Invalid mapping request or missing rationale
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "401":
+          description: Authentication required
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "404":
+          description: Passenger metric or active route variant not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+        "409":
+          description: Mapping is already set, not a candidate, or cannot be safely disambiguated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiError" }
+  /projects/{projectId}/network-recommendations:
+    get:
+      operationId: getNetworkRecommendations
+      tags: [inventory]
+      summary: Plan a source-backed route mix for a requested bus quantity, not an availability reservation
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Evidence-limited route planning recommendation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NetworkRecommendations" }
+        "400": { description: Invalid target quantity }
+        "404": { description: Project not found }
+    post:
+      operationId: planNetworkQuantity
+      tags: [inventory]
+      summary: Compute a read-only route mix for a specific proposed quantity
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NetworkQuantityInput" }
+      responses:
+        "200":
+          description: Evidence-limited route planning recommendation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NetworkRecommendations" }
+        "400": { description: Invalid target quantity }
+        "404": { description: Project not found }
+  /projects/{projectId}/bus-plan:
+    get:
+      operationId: getProjectBusPlan
+      tags: [inventory]
+      summary: Get selected route source variants and proposed bus quantities for a project
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Project bus plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectBusPlan" }
+        "404": { description: Project not found }
+    post:
+      operationId: addProjectBusRoute
+      tags: [inventory]
+      summary: Add a specific route source variant to a project's bus plan
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectBusRouteSelectionInput" }
+      responses:
+        "201":
+          description: Bus route source variant selected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectBusRouteSelection" }
+        "400": { description: "Invalid quantity, status, or override reason" }
+        "404": { description: Project or active route source variant not found }
+        "409":
+          description: Selection conflicts with existing plan data or requires an explicit override
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/BusPlanOverrideRequired"
+                  - $ref: "#/components/schemas/ApiError"
+  /projects/{projectId}/bus-plan/{selectionId}:
+    patch:
+      operationId: updateProjectBusRoute
+      tags: [inventory]
+      summary: Update a project route variant selection
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: selectionId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectBusRouteSelectionUpdate" }
+      responses:
+        "200":
+          description: Updated bus route selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectBusRouteSelection" }
+        "400": { description: Invalid update or override reason }
+        "404": { description: Project selection not found }
+        "409":
+          description: Quantity exceeds or has no source count and requires an explicit override
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BusPlanOverrideRequired" }
+    delete:
+      operationId: removeProjectBusRoute
+      tags: [inventory]
+      summary: Remove one source variant selection from a project bus plan
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: selectionId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Bus route selection removed }
+        "404": { description: Project selection not found }
+  /projects/{projectId}/media-plan:
+    get:
+      operationId: getProjectMediaPlan
+      tags: [inventory]
+      summary: Combine exact shelter/media-unit selections with the project's bus plan
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Combined project media plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectMediaPlan" }
+        "404": { description: Project not found }
+  /projects/{projectId}/inventory:
+    get:
+      operationId: listProjectInventorySelections
+      tags: [inventory]
+      summary: List inventory selected for a specific project
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Project selections
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectInventorySelection" }
+        "404": { description: Project not found }
+  /projects/{projectId}/inventory/{assetId}:
+    put:
+      operationId: setProjectInventorySelection
+      tags: [inventory]
+      summary: Add or update an asset selection for a project
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInventorySelectionInput" }
+      responses:
+        "200":
+          description: Updated project selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectInventorySelection" }
+        "404": { description: Project or asset not found }
+    delete:
+      operationId: removeProjectInventorySelection
+      tags: [inventory]
+      summary: Remove an asset from a project
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Selection removed }
+        "404": { description: Project selection not found }
+  /projects/{projectId}/inventory/{assetId}/units/{unitId}:
+    put:
+      operationId: setProjectInventoryUnitSelection
+      tags: [inventory]
+      summary: Add or update one independently selectable media unit
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: unitId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectInventorySelectionInput" }
+      responses:
+        "200":
+          description: Updated unit selection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectInventorySelection" }
+        "404": { description: Unit or project not found }
+    delete:
+      operationId: removeProjectInventoryUnitSelection
+      tags: [inventory]
+      summary: Remove an individual unit selection
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: assetId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: unitId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Unit selection removed }
+  /projects/{projectId}/location-strategy:
+    get:
+      operationId: getProjectLocationStrategy
+      tags: [inventory]
+      summary: Get a project's editable location strategy
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Strategy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectLocationStrategy" }
+        "404": { description: Project not found }
+    put:
+      operationId: saveProjectLocationStrategy
+      tags: [inventory]
+      summary: Save a draft or approve the project location strategy
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectLocationStrategyInput" }
+      responses:
+        "200":
+          description: Saved strategy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectLocationStrategy" }
+        "404": { description: Project not found }
+  /projects/{projectId}/locations:
+    get:
+      operationId: listProjectLocations
+      tags: [inventory]
+      summary: List project-scoped locations and evidence
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectLocation" }
+        "404": { description: Project not found }
+    post:
+      operationId: addProjectLocation
+      tags: [inventory]
+      summary: Add a user-entered location with explicit evidence
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectLocationInput" }
+      responses:
+        "201":
+          description: Location saved as needing review
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectLocation" }
+        "404": { description: Project not found }
+  /projects/{projectId}/locations/discover:
+    post:
+      operationId: discoverProjectLocations
+      tags: [inventory]
+      summary: Search for location candidates; all results require human review
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LocationDiscoveryInput" }
+      responses:
+        "200":
+          description: Provider candidates persisted as needing review
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProjectLocation" }
+        "404": { description: Project not found }
+        "502": { description: Location provider unavailable }
+  /projects/{projectId}/locations/{locationId}/review:
+    put:
+      operationId: reviewProjectLocation
+      tags: [inventory]
+      summary: Approve or reject a source-backed location
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: locationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectLocationReviewInput" }
+      responses:
+        "200":
+          description: Reviewed location
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectLocation" }
+        "404": { description: Project or location not found }
+  /projects/{projectId}/location-recommendations/{radiusMeters}:
+    get:
+      operationId: getProjectLocationRecommendations
+      tags: [inventory]
+      summary: Generate deterministic shelter and route recommendations from approved strategy and evidence
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: radiusMeters, in: path, required: true, schema: { type: integer, enum: [200, 500, 800, 1000] } }
+      responses:
+        "200":
+          description: Explainable recommendations
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocationRecommendations" }
+        "404": { description: Project not found }
+  /projects/{projectId}/store-coverage:
+    get:
+      operationId: getStoreCoverage
+      tags: [inventory]
+      summary: Count unique active shelters and media units near approved client locations at four straight-line bands
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Per-location and deduplicated aggregate coverage, not footfall or reach
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StoreCoverage" }
+        "404": { description: Project not found }
+  /projects/{projectId}/location-recommendations/{recommendationId}/decision:
+    put:
+      operationId: decideProjectLocationRecommendation
+      tags: [inventory]
+      summary: Shortlist or reject a recommendation with optional feedback
+      parameters:
+        - { name: projectId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: recommendationId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LocationRecommendationDecisionInput" }
+      responses:
+        "200":
+          description: Persisted decision
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LocationRecommendationDecisionResult" }
+        "404": { description: Project or recommendation not found }
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    LocationCategory:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120 }
+        priority: { type: integer, minimum: 1, maximum: 5 }
+      required: [name, priority]
+    ProjectLocationStrategyInput:
+      type: object
+      properties:
+        categories: { type: array, maxItems: 30, items: { $ref: "#/components/schemas/LocationCategory" } }
+        targetAreas: { type: array, maxItems: 100, items: { type: string, maxLength: 160 } }
+        targetRoads: { type: array, maxItems: 100, items: { type: string, maxLength: 160 } }
+        audience: { type: ["string", "null"], maxLength: 2000 }
+        preferredFormats: { type: array, items: { type: string, enum: [STATIC_TOP_PANEL, DIGITAL_TOP_PANEL, STATIC_MUPI, DIGITAL_MUPI] } }
+        campaignScale: { type: string, enum: [FOCUSED, BALANCED, HIGH_PRESENCE] }
+        status: { type: string, enum: [DRAFT, APPROVED] }
+      required: [categories, targetAreas, targetRoads, audience, preferredFormats, campaignScale, status]
+    ProjectLocationStrategy:
+      allOf:
+        - $ref: "#/components/schemas/ProjectLocationStrategyInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            projectId: { type: string, format: uuid }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+          required: [id, projectId, createdAt, updatedAt]
+    ProjectLocationInput:
+      type: object
+      properties:
+        role: { type: string, enum: [CLIENT, COMPETITOR, POI] }
+        name: { type: string, minLength: 1, maxLength: 240 }
+        brand: { type: ["string", "null"], maxLength: 240 }
+        category: { type: string, minLength: 1, maxLength: 160 }
+        address: { type: ["string", "null"], maxLength: 1000 }
+        latitude: { type: ["number", "null"], minimum: -90, maximum: 90 }
+        longitude: { type: ["number", "null"], minimum: -180, maximum: 180 }
+        area: { type: ["string", "null"], maxLength: 160 }
+        sourceUrl: { type: ["string", "null"], format: uri, maxLength: 2048 }
+        evidence: { type: string, minLength: 1, maxLength: 4000 }
+      required: [role, name, category, evidence]
+    ProjectLocation:
+      allOf:
+        - $ref: "#/components/schemas/ProjectLocationInput"
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            projectId: { type: string, format: uuid }
+            poiId: { type: ["string", "null"], format: uuid }
+            locationType:
+              type: string
+              enum: [BRAND_STORE, AUTHORIZED_RETAILER, CAMPAIGN_ACTIVATION_LOCATION, DEALER_DISTRIBUTOR, EXHIBITION_VENUE, UNVERIFIED_CANDIDATE]
+            campaignGeographyStatus:
+              type: ["string", "null"]
+              enum: [IN_CAMPAIGN_GEOGRAPHY, OUTSIDE_CAMPAIGN_GEOGRAPHY, UNVERIFIED_CAMPAIGN_GEOGRAPHY, null]
+            coordinatesSourceUrl: { type: ["string", "null"], format: uri }
+            sourceDate: { type: ["string", "null"], format: date }
+            evidenceType:
+              type: ["string", "null"]
+              enum: [HISENSE_OFFICIAL_STORE_LOCATOR, HISENSE_OFFICIAL_CAMPAIGN_PAGE, HISENSE_OFFICIAL_TERMS_PDF, HISENSE_OFFICIAL_RETAILER_LIST, HISENSE_OFFICIAL_NEWSROOM, OFFICIAL_MALL_DIRECTORY, MAP_DIRECTORY, USER_PROVIDED, OTHER, null]
+            evidenceStatus:
+              type: string
+              enum: [OFFICIAL_SOURCE_VERIFIED, OFFICIAL_TEXT_COORDINATES_UNVERIFIED, NEEDS_SOURCE_VERIFICATION, USER_PROVIDED]
+            provider: { type: ["string", "null"] }
+            providerId: { type: ["string", "null"] }
+            sourceReference: { type: ["string", "null"] }
+            retrievedAt: { type: string, format: date-time }
+            confidence: { type: string, enum: [LIKELY, NEEDS_REVIEW, USER_PROVIDED] }
+            reviewStatus: { type: string, enum: [NEEDS_REVIEW, APPROVED, REJECTED] }
+            reviewNote: { type: ["string", "null"] }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+          required: [id, projectId, poiId, locationType, coordinatesSourceUrl, sourceDate, evidenceType, evidenceStatus, provider, providerId, sourceReference, retrievedAt, confidence, reviewStatus, reviewNote, createdAt, updatedAt]
+    LocationDiscoveryInput:
+      type: object
+      properties:
+        query: { type: string, minLength: 2, maxLength: 300 }
+        role: { type: string, enum: [CLIENT, COMPETITOR, POI] }
+        brand: { type: ["string", "null"], maxLength: 240 }
+        limit: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      required: [query, role]
+    ProjectLocationReviewInput:
+      type: object
+      properties:
+        decision: { type: string, enum: [APPROVED, REJECTED, NEEDS_REVIEW] }
+        note: { type: ["string", "null"], maxLength: 2000 }
+      required: [decision]
+    LocationScoreComponent:
+      type: object
+      properties:
+        criterion: { type: string }
+        points: { type: integer }
+        maximum: { type: integer }
+        explanation: { type: string }
+      required: [criterion, points, maximum, explanation]
+    NearbyProjectLocation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        role: { type: string, enum: [CLIENT, COMPETITOR, POI] }
+        name: { type: string }
+        category: { type: string }
+        distanceMeters: { type: number }
+        distanceLabel: { type: string }
+      required: [id, role, name, category, distanceMeters, distanceLabel]
+    LocationRecommendation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        inventoryAssetId: { type: ["string", "null"], format: uuid }
+        inventoryMediaUnitId: { type: ["string", "null"], format: uuid }
+        assetCode: { type: ["string", "null"] }
+        assetName: { type: ["string", "null"] }
+        latitude: { type: ["number", "null"], minimum: -90, maximum: 90 }
+        longitude: { type: ["number", "null"], minimum: -180, maximum: 180 }
+        unitType: { type: ["string", "null"] }
+        format: { type: ["string", "null"] }
+        distanceMeters: { type: ["number", "null"] }
+        distanceLabel: { type: ["string", "null"] }
+        nearbyLocations: { type: array, items: { $ref: "#/components/schemas/NearbyProjectLocation" } }
+        score: { type: integer, minimum: 0, maximum: 100 }
+        scoringVersion: { type: string }
+        components: { type: array, items: { $ref: "#/components/schemas/LocationScoreComponent" } }
+        explanation: { type: array, items: { type: string } }
+        missingInformation: { type: array, items: { type: string } }
+        decision: { type: string, enum: [UNREVIEWED, SHORTLISTED, REJECTED] }
+        decisionReason: { type: ["string", "null"] }
+        isCurrent: { type: boolean }
+      required: [id, projectId, inventoryAssetId, inventoryMediaUnitId, assetCode, assetName, latitude, longitude, unitType, format, distanceMeters, distanceLabel, nearbyLocations, score, scoringVersion, components, explanation, missingInformation, decision, decisionReason, isCurrent]
+    RouteLocationRecommendation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        routeId: { type: string }
+        sourceVariantId: { type: string, format: uuid }
+        from: { type: ["string", "null"] }
+        to: { type: ["string", "null"] }
+        via: { type: ["string", "null"] }
+        depot: { type: ["string", "null"] }
+        sourceBusCount: { type: ["integer", "null"] }
+        suggestedQuantity: { type: integer, minimum: 1 }
+        quantityLabel: { type: string, enum: [AI_SUGGESTED_PLANNING_QUANTITY] }
+        score: { type: integer }
+        scoringVersion: { type: string }
+        explanation: { type: array, items: { type: string } }
+        missingInformation: { type: array, items: { type: string } }
+        decision: { type: string, enum: [UNREVIEWED, SHORTLISTED, REJECTED] }
+        isCurrent: { type: boolean }
+      required: [id, routeId, sourceVariantId, from, to, via, depot, sourceBusCount, suggestedQuantity, quantityLabel, score, scoringVersion, explanation, missingInformation, decision, isCurrent]
+    LocationRecommendations:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        radiusMeters: { type: integer, enum: [200, 500, 800, 1000] }
+        strategyStatus: { type: string, enum: [DRAFT, APPROVED] }
+        shelters: { type: array, items: { $ref: "#/components/schemas/LocationRecommendation" } }
+        routes: { type: array, items: { $ref: "#/components/schemas/RouteLocationRecommendation" } }
+        limitations: { type: array, items: { type: string } }
+      required: [projectId, radiusMeters, strategyStatus, shelters, routes, limitations]
+    StoreCoverageMediaCounts:
+      type: object
+      properties:
+        digitalTopPanels: { type: integer, minimum: 0 }
+        digitalMupis: { type: integer, minimum: 0 }
+        static: { type: integer, minimum: 0 }
+      required: [digitalTopPanels, digitalMupis, static]
+    StoreCoverageLocationBand:
+      type: object
+      properties:
+        shelterCount: { type: integer, minimum: 0 }
+        matchedShelterIds: { type: array, items: { type: string, format: uuid } }
+        mediaUnitCounts: { $ref: "#/components/schemas/StoreCoverageMediaCounts" }
+      required: [shelterCount, matchedShelterIds, mediaUnitCounts]
+    StoreCoverageAggregateBand:
+      type: object
+      properties:
+        locationsCoveredCount: { type: integer, minimum: 0 }
+        uniqueShelterCount: { type: integer, minimum: 0 }
+        mediaUnitCounts: { $ref: "#/components/schemas/StoreCoverageMediaCounts" }
+      required: [locationsCoveredCount, uniqueShelterCount, mediaUnitCounts]
+    StoreCoverageNearShelter:
+      type: object
+      properties:
+        shelterId: { type: string, format: uuid }
+        assetCode: { type: string }
+        assetName: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        distanceMeters: { type: number }
+        mediaUnitCounts: { $ref: "#/components/schemas/StoreCoverageMediaCounts" }
+      required: [shelterId, assetCode, assetName, latitude, longitude, distanceMeters, mediaUnitCounts]
+    StoreCoverageLocation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        category: { type: string }
+        address: { type: string }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        bands:
+          type: object
+          properties:
+            "200": { $ref: "#/components/schemas/StoreCoverageLocationBand" }
+            "500": { $ref: "#/components/schemas/StoreCoverageLocationBand" }
+            "800": { $ref: "#/components/schemas/StoreCoverageLocationBand" }
+            "1000": { $ref: "#/components/schemas/StoreCoverageLocationBand" }
+          required: ["200", "500", "800", "1000"]
+        nearbyShelters: { type: array, items: { $ref: "#/components/schemas/StoreCoverageNearShelter" } }
+      required: [id, name, category, address, latitude, longitude, bands, nearbyShelters]
+    StoreCoverage:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        radiiMeters: { type: array, items: { type: integer, enum: [200, 500, 800, 1000] } }
+        locations: { type: array, items: { $ref: "#/components/schemas/StoreCoverageLocation" } }
+        aggregate:
+          type: object
+          properties:
+            bands:
+              type: object
+              properties:
+                "200": { $ref: "#/components/schemas/StoreCoverageAggregateBand" }
+                "500": { $ref: "#/components/schemas/StoreCoverageAggregateBand" }
+                "800": { $ref: "#/components/schemas/StoreCoverageAggregateBand" }
+                "1000": { $ref: "#/components/schemas/StoreCoverageAggregateBand" }
+              required: ["200", "500", "800", "1000"]
+          required: [bands]
+        limitations: { type: array, items: { type: string } }
+      required: [projectId, radiiMeters, locations, aggregate, limitations]
+    PassengerMetricMappingStatus:
+      type: string
+      enum: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT]
+    PassengerRouteCandidate:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        routeId: { type: string }
+        sourceVariantId: { type: string, format: uuid }
+        sourceIdentity: { type: string }
+        sourceSheet: { type: string }
+        sourceRow: { type: integer }
+        from: { type: ["string", "null"] }
+        to: { type: ["string", "null"] }
+        via: { type: ["string", "null"] }
+        sourceBusCount: { type: ["integer", "null"] }
+      required: [id, routeId]
+    PassengerCsvUploadInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 240, pattern: "\\.[cC][sS][vV]$" }
+        size: { type: integer, minimum: 1, maximum: 20971520 }
+        contentType: { type: string, description: Accepted by the client as text/csv; the route uses name and size to validate the upload. }
+      required: [name, size]
+    PassengerCsvUpload:
+      type: object
+      properties:
+        uploadUrl: { type: string, format: uri, description: Short-lived signed URL for a private App Storage PUT upload. }
+        objectPath: { type: string, description: Opaque private App Storage path; only returned to the authenticated caller and not a public serving URL. }
+        maximumBytes: { type: integer, enum: [20971520] }
+      required: [uploadUrl, objectPath, maximumBytes]
+    PassengerCsvUploadDeleteInput:
+      type: object
+      properties:
+        objectPath: { type: string, pattern: "^/objects/passenger-metrics/[0-9a-fA-F-]{36}\\.csv$" }
+      required: [objectPath]
+    PassengerColumnMapping:
+      type: object
+      properties:
+        routeIdentifier: { type: string, minLength: 1 }
+        month: { type: string, minLength: 1 }
+        passengers: { type: string, minLength: 1 }
+        trips: { type: ["string", "null"] }
+        routeVariant: { type: ["string", "null"] }
+      required: [routeIdentifier, month, passengers]
+    PassengerMetricMappingOverride:
+      type: object
+      properties:
+        sourceRow: { type: integer, minimum: 2 }
+        sourceVariantId: { type: string, format: uuid }
+        note: { type: string, minLength: 10, maxLength: 500 }
+      required: [sourceRow, sourceVariantId, note]
+    PassengerMetricImportInput:
+      type: object
+      properties:
+        sourceFile: { type: string, minLength: 1, maxLength: 240, pattern: "\\.[cC][sS][vV]$" }
+        objectPath: { type: string, pattern: "^/objects/passenger-metrics/[0-9a-fA-F-]{36}\\.csv$", description: Opaque private App Storage path from PassengerCsvUpload; not publicly served. }
+        mapping: { $ref: "#/components/schemas/PassengerColumnMapping" }
+        overrides:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/PassengerMetricMappingOverride" }
+      required: [sourceFile, objectPath, mapping]
+    PassengerMetricImportSummary:
+      type: object
+      properties:
+        MATCHED_VARIANT: { type: integer, minimum: 0 }
+        ROUTE_LEVEL_ONLY: { type: integer, minimum: 0 }
+        UNMATCHED: { type: integer, minimum: 0 }
+        CONFLICT: { type: integer, minimum: 0 }
+      required: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT]
+    PassengerMetricPreviewSummary:
+      allOf:
+        - $ref: "#/components/schemas/PassengerMetricImportSummary"
+        - type: object
+          properties:
+            INVALID: { type: integer, minimum: 0 }
+          required: [INVALID]
+    PassengerMetricImportQuality:
+      type: object
+      properties:
+        validRows: { type: integer }
+        statusCounts: { $ref: "#/components/schemas/PassengerMetricImportSummary" }
+        periods: { $ref: "#/components/schemas/PassengerMetricPeriodCoverage" }
+        exampleMappings:
+          type: array
+          maxItems: 12
+          items: { $ref: "#/components/schemas/PassengerMetricMappingExample" }
+      required: [validRows, statusCounts, periods, exampleMappings]
+    PassengerMetricPeriodCoverage:
+      type: object
+      description: Distinct months with source data and any absent months between the first and last observations; this does not imply continuous coverage.
+      properties:
+        distinctMonthCount: { type: integer, minimum: 0 }
+        availableMonths:
+          type: array
+          items: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        firstMonth: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        lastMonth: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        missingMonthCount: { type: integer, minimum: 0 }
+        missingMonths:
+          type: array
+          description: Months absent within the observed first-to-last month range.
+          items: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        rangeLabel: { type: string, description: "Human-readable distinct-month wording, for example: 78 months of data available within Jan 2018–Dec 2025." }
+      required: [distinctMonthCount, availableMonths, firstMonth, lastMonth, missingMonthCount, missingMonths, rangeLabel]
+    PassengerMetricMappingExample:
+      type: object
+      properties:
+        sourceRow: { type: integer }
+        sourceRouteIdentifier: { type: string }
+        status: { $ref: "#/components/schemas/PassengerMetricMappingStatus" }
+        candidates:
+          type: array
+          maxItems: 8
+          items: { $ref: "#/components/schemas/PassengerMetricCandidateExample" }
+      required: [sourceRow, sourceRouteIdentifier, status, candidates]
+    PassengerMetricCandidateExample:
+      type: object
+      properties:
+        routeId: { type: string }
+        sourceSheet: { type: ["string", "null"] }
+        sourceRow: { type: ["integer", "null"] }
+      required: [routeId, sourceSheet, sourceRow]
+    PassengerMetricImportRow:
+      type: object
+      properties:
+        sourceRouteIdentifier: { type: string }
+        normalizedSourceRouteIdentifier: { type: string }
+        sourceVariantIdentifier: { type: ["string", "null"] }
+        month: { type: string }
+        passengerCount: { type: integer, minimum: 0 }
+        tripCount: { type: ["integer", "null"], minimum: 0 }
+        sourceRow: { type: integer, minimum: 2 }
+        mappingStatus: { $ref: "#/components/schemas/PassengerMetricMappingStatus" }
+        busRouteId: { type: ["string", "null"], format: uuid }
+        sourceVariantId: { type: ["string", "null"], format: uuid }
+        matchedRouteId: { type: ["string", "null"] }
+        routeCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/PassengerRouteCandidate" }
+        error: { type: ["string", "null"] }
+      required: [sourceRouteIdentifier, normalizedSourceRouteIdentifier, sourceVariantIdentifier, month, passengerCount, tripCount, sourceRow, mappingStatus, busRouteId, sourceVariantId, matchedRouteId, routeCandidates, error]
+    PassengerMetricImportPreview:
+      type: object
+      properties:
+        sourceFile: { type: string }
+        sourceObjectPath: { type: string, description: Opaque private App Storage path returned only to the authenticated caller; it is not publicly served. }
+        headers:
+          type: array
+          items: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/PassengerMetricImportRow" }
+        summary: { $ref: "#/components/schemas/PassengerMetricPreviewSummary" }
+        quality: { $ref: "#/components/schemas/PassengerMetricImportQuality" }
+      required: [sourceFile, sourceObjectPath, headers, rows, summary, quality]
+    PassengerMetricPreviewError:
+      type: object
+      properties:
+        error: { type: string }
+        sourceFile: { type: string }
+        summary:
+          type: object
+          properties:
+            MATCHED_VARIANT: { type: integer }
+            ROUTE_LEVEL_ONLY: { type: integer }
+            UNMATCHED: { type: integer }
+            CONFLICT: { type: integer }
+            INVALID: { type: integer }
+          required: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT, INVALID]
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/PassengerMetricImportRow" }
+      required: [error]
+    PassengerMetricImportBatch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceFile: { type: string }
+        sourceObjectPath: { type: string, description: Opaque private App Storage path for audit; only in protected APIs and not a public serving URL. }
+        sourceSha256: { type: string, pattern: "^[0-9a-f]{64}$" }
+        sourceRowCount: { type: integer, minimum: 0 }
+        importedAt: { type: string, format: date-time }
+      required: [id, sourceFile, sourceObjectPath, sourceSha256, sourceRowCount, importedAt]
+    PassengerMetricImportHistoryItem:
+      allOf:
+        - $ref: "#/components/schemas/PassengerMetricImportBatch"
+        - type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                MATCHED_VARIANT: { type: integer, minimum: 0 }
+                ROUTE_LEVEL_ONLY: { type: integer, minimum: 0 }
+                UNMATCHED: { type: integer, minimum: 0 }
+                CONFLICT: { type: integer, minimum: 0 }
+              required: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT]
+          required: [summary]
+    PassengerMetricImportResult:
+      type: object
+      properties:
+        importBatch: { $ref: "#/components/schemas/PassengerMetricImportBatch" }
+        rowCount: { type: integer, minimum: 0 }
+        summary:
+          type: object
+          properties:
+            MATCHED_VARIANT: { type: integer, minimum: 0 }
+            ROUTE_LEVEL_ONLY: { type: integer, minimum: 0 }
+            UNMATCHED: { type: integer, minimum: 0 }
+            CONFLICT: { type: integer, minimum: 0 }
+          required: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT]
+        quality: { $ref: "#/components/schemas/PassengerMetricImportQuality" }
+        note: { type: string }
+      required: [importBatch, rowCount, summary, quality, note]
+    PassengerMetricImportError:
+      type: object
+      properties:
+        error: { type: string }
+        summary:
+          type: object
+          properties:
+            MATCHED_VARIANT: { type: integer }
+            ROUTE_LEVEL_ONLY: { type: integer }
+            UNMATCHED: { type: integer }
+            CONFLICT: { type: integer }
+            INVALID: { type: integer }
+          required: [MATCHED_VARIANT, ROUTE_LEVEL_ONLY, UNMATCHED, CONFLICT, INVALID]
+      required: [error]
+    PassengerRouteMetric:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        importBatchId: { type: string, format: uuid }
+        sourceRouteIdentifier: { type: string }
+        normalizedSourceRouteIdentifier: { type: string }
+        sourceVariantIdentifier: { type: ["string", "null"] }
+        sourceValues:
+          type: object
+          additionalProperties: { type: string }
+          description: Original source row values retained for audit; returned only from protected endpoints.
+        routeId: { type: ["string", "null"] }
+        busRouteId: { type: ["string", "null"], format: uuid }
+        sourceVariantId: { type: ["string", "null"], format: uuid }
+        routeCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/PassengerRouteCandidate" }
+        mappingStatus: { $ref: "#/components/schemas/PassengerMetricMappingStatus" }
+        mappingMethod: { type: string }
+        mappingNote: { type: ["string", "null"] }
+        month: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        passengerCount: { type: integer, minimum: 0 }
+        tripCount: { type: ["integer", "null"], minimum: 0 }
+        sourceFile: { type: string }
+        sourceRow: { type: integer, minimum: 2 }
+        importedAt: { type: string, format: date-time }
+      required: [id, importBatchId, sourceRouteIdentifier, normalizedSourceRouteIdentifier, sourceVariantIdentifier, sourceValues, routeId, busRouteId, sourceVariantId, routeCandidates, mappingStatus, mappingMethod, mappingNote, month, passengerCount, tripCount, sourceFile, sourceRow, importedAt]
+    PassengerMetricMappingInput:
+      type: object
+      properties:
+        sourceVariantId: { type: string, format: uuid }
+        note: { type: string, minLength: 10, maxLength: 500 }
+      required: [sourceVariantId, note]
+    PassengerRouteMetricMappingResult:
+      allOf:
+        - $ref: "#/components/schemas/PassengerRouteMetric"
+        - type: object
+          properties:
+            routeId: { type: string }
+          required: [routeId]
+    PassengerPeriodValue:
+      type: object
+      properties:
+        period: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        passengerCount: { type: integer, minimum: 0 }
+        tripCount: { type: ["integer", "null"], minimum: 0 }
+        passengersPerTrip: { type: ["number", "null"], minimum: 0 }
+        sourceFile: { type: string }
+        sourceRow: { type: integer, minimum: 2 }
+      required: [period, passengerCount, tripCount, passengersPerTrip, sourceFile, sourceRow]
+    PassengerRouteSeriesSummary:
+      type: object
+      properties:
+        routeId: { type: string }
+        sourceVariantId: { type: string, format: uuid }
+        latest: { oneOf: [{ $ref: "#/components/schemas/PassengerPeriodValue" }, { type: "null" }] }
+        previous: { oneOf: [{ $ref: "#/components/schemas/PassengerPeriodValue" }, { type: "null" }] }
+        firstPeriod: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        lastPeriod: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        threeMonthAverage: { type: ["number", "null"], minimum: 0 }
+        threeMonthPeriods: { type: integer, minimum: 0, maximum: 3 }
+        sixMonthAverage: { type: ["number", "null"], minimum: 0 }
+        sixMonthPeriods: { type: integer, minimum: 0, maximum: 6 }
+        availableTotal: { type: ["integer", "null"], minimum: 0 }
+        availablePeriods: { type: integer, minimum: 0 }
+        duplicatePeriods: { type: integer, minimum: 0 }
+        conflictingPeriods: { type: integer, minimum: 0 }
+        passengerPercentile: { type: ["number", "null"], minimum: 0, maximum: 100 }
+        activity: { type: string, enum: [REPORTED_PASSENGER_ACTIVITY, NO_ACTIVITY_REPORTED, NO_METRIC] }
+      required: [routeId, sourceVariantId, latest, previous, firstPeriod, lastPeriod, threeMonthAverage, threeMonthPeriods, sixMonthAverage, sixMonthPeriods, availableTotal, availablePeriods, duplicatePeriods, conflictingPeriods, passengerPercentile, activity]
+    PassengerRouteFamilyEvidenceSummary:
+      type: object
+      description: A route-family-only trend summary. It is reported once per family and is not evidence for any individual source variant.
+      properties:
+        routeId: { type: string }
+        latest: { oneOf: [{ $ref: "#/components/schemas/PassengerPeriodValue" }, { type: "null" }] }
+        previous: { oneOf: [{ $ref: "#/components/schemas/PassengerPeriodValue" }, { type: "null" }] }
+        firstPeriod: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        lastPeriod: { type: ["string", "null"], pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        threeMonthAverage: { type: ["number", "null"], minimum: 0 }
+        threeMonthPeriods: { type: integer, minimum: 0, maximum: 3 }
+        sixMonthAverage: { type: ["number", "null"], minimum: 0 }
+        sixMonthPeriods: { type: integer, minimum: 0, maximum: 6 }
+        availableTotal: { type: ["integer", "null"], minimum: 0 }
+        availablePeriods: { type: integer, minimum: 0 }
+        duplicatePeriods: { type: integer, minimum: 0 }
+        conflictingPeriods: { type: integer, minimum: 0 }
+        passengerPercentile: { type: "null", description: Route-family-only evidence is not ranked against source variants. }
+        activity: { type: string, enum: [REPORTED_PASSENGER_ACTIVITY, NO_ACTIVITY_REPORTED, NO_METRIC] }
+        mappingStatus: { type: string, enum: [ROUTE_LEVEL_ONLY] }
+      required: [routeId, latest, previous, firstPeriod, lastPeriod, threeMonthAverage, threeMonthPeriods, sixMonthAverage, sixMonthPeriods, availableTotal, availablePeriods, duplicatePeriods, conflictingPeriods, passengerPercentile, activity, mappingStatus]
+    NetworkPassengerEvidenceSource:
+      type: string
+      enum: [PASSENGER_EVIDENCE, GEOGRAPHY_FROM_TO_VIA, SOURCE_BUS_COUNT]
+    NetworkRoutePassengerEvidence:
+      type: object
+      properties:
+        routeId: { type: string }
+        sourceVariantId: { type: string, format: uuid }
+        source: { type: string }
+        period: { type: string, pattern: "^\\d{4}-(0[1-9]|1[0-2])$" }
+        passengerCount: { type: integer, minimum: 0 }
+        tripCount: { type: ["integer", "null"], minimum: 0 }
+        sourceRow: { type: integer, minimum: 2 }
+        importedAt: { type: string, format: date-time }
+        summary: { $ref: "#/components/schemas/PassengerRouteSeriesSummary" }
+        projectGeographyContext: { type: string }
+        evidenceType: { type: string, enum: [route-level passenger data] }
+      required: [routeId, sourceVariantId, source, period, passengerCount, projectGeographyContext, evidenceType]
+    NetworkRouteRecommendation:
+      type: object
+      properties:
+        sourceVariantId: { type: string, format: uuid }
+        routeId: { type: string }
+        from: { type: ["string", "null"] }
+        to: { type: ["string", "null"] }
+        via: { type: ["string", "null"] }
+        depot: { type: ["string", "null"] }
+        sourceSheet: { type: string }
+        sourceRow: { type: integer }
+        sourceBusCount: { type: ["integer", "null"] }
+        isActive: { type: boolean }
+        isRejected: { type: boolean }
+        proposedQuantity: { type: integer, minimum: 1 }
+        matchedTargets: { type: array, items: { type: string } }
+        targetOverlapRatio: { type: number, minimum: 0, maximum: 1 }
+        reportedSourceBusCountShare: { type: ["number", "null"], minimum: 0, maximum: 1 }
+        routePassengerEvidence:
+          type: array
+          items: { $ref: "#/components/schemas/NetworkRoutePassengerEvidence" }
+        routePassengerSummary: { $ref: "#/components/schemas/PassengerRouteSeriesSummary" }
+        routeFamilyPassengerEvidence: { type: string, enum: [ROUTE_LEVEL_ONLY], description: Route-family passenger evidence exists, but is not variant-specific and must not be copied to this variant. }
+        evidenceSources: { type: array, items: { $ref: "#/components/schemas/NetworkPassengerEvidenceSource" } }
+        rationale: { type: string }
+        quantityBasis: { type: string }
+      required: [sourceVariantId, routeId, from, to, via, depot, sourceSheet, sourceRow, sourceBusCount, isActive, isRejected, proposedQuantity, matchedTargets, targetOverlapRatio, reportedSourceBusCountShare, evidenceSources, rationale, quantityBasis]
+    NetworkPassengerEvidenceCoverage:
+      type: object
+      properties:
+        supportedRecommendedVariants: { type: integer, minimum: 0 }
+        recommendedVariants: { type: integer, minimum: 0 }
+        label: { type: string, description: "Count label, for example: Passenger-supported recommended variants: 3 of 16." }
+      required: [supportedRecommendedVariants, recommendedVariants, label]
+    NetworkRouteFamilyPassengerEvidence:
+      type: object
+      description: One route-family passenger summary per route family; values are not repeated on member variants.
+      properties:
+        routeId: { type: string }
+        summary: { $ref: "#/components/schemas/PassengerRouteFamilyEvidenceSummary" }
+      required: [routeId, summary]
+    NetworkQuantityInput:
+      type: object
+      properties:
+        targetBuses: { type: integer, minimum: 1, maximum: 10000 }
+      required: [targetBuses]
+    NetworkRecommendations:
+      type: object
+      properties:
+        geography: { type: ["string", "null"] }
+        geographyScope: { type: string, enum: [project context only; route operating geography unverified] }
+        targetBuses: { type: integer }
+        proposedTotal: { type: integer }
+        shortfall: { type: integer }
+        recommendations: { type: array, items: { $ref: "#/components/schemas/NetworkRouteRecommendation" } }
+        passengerEvidenceCoverage: { $ref: "#/components/schemas/NetworkPassengerEvidenceCoverage" }
+        routeFamilyPassengerEvidence:
+          type: array
+          items: { $ref: "#/components/schemas/NetworkRouteFamilyPassengerEvidence" }
+        limitations: { type: array, items: { type: string } }
+        routeLevelEvidence:
+          type: object
+          properties:
+            provider: { type: string, enum: [RTA passenger data] }
+            status: { type: string, enum: [available, unavailable] }
+            passengers: { type: "null" }
+            impressions: { type: "null" }
+            reach: { type: "null" }
+            note: { type: string }
+          required: [provider, status, passengers, impressions, reach, note]
+      required: [geography, geographyScope, targetBuses, proposedTotal, shortfall, recommendations, passengerEvidenceCoverage, routeFamilyPassengerEvidence, limitations, routeLevelEvidence]
+    LocationRecommendationDecisionInput:
+      type: object
+      properties:
+        decision: { type: string, enum: [SHORTLISTED, REJECTED] }
+        reason: { type: ["string", "null"], enum: [Too far, Wrong area, Wrong format, Client preference, Other, null] }
+        note: { type: ["string", "null"], maxLength: 2000 }
+      required: [decision]
+    LocationRecommendationDecisionResult:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        inventoryAssetId: { type: ["string", "null"], format: uuid }
+        inventoryMediaUnitId: { type: ["string", "null"], format: uuid }
+        decision: { type: string, enum: [UNREVIEWED, SHORTLISTED, REJECTED] }
+        decisionReason: { type: ["string", "null"] }
+        decisionNote: { type: ["string", "null"] }
+        isCurrent: { type: boolean }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, inventoryAssetId, inventoryMediaUnitId, decision, decisionReason, decisionNote, isCurrent, updatedAt]
+    PitchProject:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        clientId: { type: string, format: uuid }
+        clientName: { type: string }
+        title: { type: string }
+        market: { type: string }
+        campaignGeography:
+          type: string
+          enum: [DUBAI, ABU_DHABI, UAE, CUSTOM]
+          description: Campaign targeting geography; CUSTOM requires campaignAreas.
+        campaignAreas:
+          type: array
+          description: Required and non-empty for CUSTOM; must be empty for preset geographies.
+          items: { type: string, minLength: 2, maxLength: 80 }
+        category: { type: ["string", "null"] }
+        pitchObjective: { type: ["string", "null"] }
+        productFocus: { type: ["string", "null"] }
+        regionalEntity: { type: ["string", "null"] }
+        preferredMedia: { type: ["string", "null"], enum: [bus, bus_shelter, both, null] }
+        targetQuantity: { type: ["integer", "null"], minimum: 1, maximum: 1000 }
+        stage:
+          type: string
+          enum: [research, explore, decide, plan, create, pitch]
+        status:
+          type: string
+          enum: [active, on_hold, completed]
+        isDemo: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, clientId, clientName, title, market, campaignGeography, campaignAreas, regionalEntity, preferredMedia, targetQuantity, stage, status, isDemo, createdAt, updatedAt]
+    ProjectInput:
+      type: object
+      properties:
+        clientName: { type: string, minLength: 1, maxLength: 120 }
+        market: { type: string, minLength: 1, maxLength: 120 }
+        campaignGeography:
+          type: string
+          enum: [DUBAI, ABU_DHABI, UAE, CUSTOM]
+          description: Defaults to DUBAI; CUSTOM requires campaignAreas.
+        campaignAreas:
+          type: array
+          description: Required and non-empty for CUSTOM; must be empty for preset geographies.
+          items: { type: string, minLength: 2, maxLength: 80 }
+        category: { type: ["string", "null"], maxLength: 120 }
+        pitchObjective:
+          type: string
+          enum: [Store / Branch Footfall, Product Launch, Brand Awareness, Seasonal Campaign, Specific Area Coverage, Competitor Response, General OOH Proposal]
+        productFocus: { type: ["string", "null"], maxLength: 180 }
+        preferredMedia: { type: string, enum: [bus, bus_shelter, both] }
+        targetQuantity: { type: ["integer", "null"], minimum: 1, maximum: 1000 }
+        brandSelectionToken: { type: string, minLength: 1, maxLength: 8192 }
+      required: [clientName, market]
+    BrandOptionsInput:
+      type: object
+      properties:
+        query: { type: string, minLength: 1, maxLength: 120 }
+      required: [query]
+    BrandRegionalEntity:
+      type: object
+      properties:
+        name: { type: string }
+        sourceUrl: { type: string, format: uri }
+        evidenceQuote: { type: string }
+      required: [name, sourceUrl, evidenceQuote]
+    BrandOption:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [company, brand, category]
+        name: { type: string }
+        parent: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        website: { type: string, format: uri }
+        sourceUrl: { type: string, format: uri }
+        evidenceQuote: { type: string }
+        regionalEntity:
+          oneOf:
+            - $ref: "#/components/schemas/BrandRegionalEntity"
+            - type: "null"
+        selectionToken: { type: string }
+      required: [kind, name, parent, category, website, sourceUrl, evidenceQuote, regionalEntity, selectionToken]
+    BrandOptionsResponse:
+      type: object
+      properties:
+        options:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/BrandOption"
+      required: [options]
+    ProjectUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 180 }
+        market: { type: string, minLength: 1, maxLength: 120 }
+        campaignGeography:
+          type: string
+          enum: [DUBAI, ABU_DHABI, UAE, CUSTOM]
+          description: CUSTOM requires campaignAreas.
+        campaignAreas:
+          type: array
+          description: Required and non-empty for CUSTOM; must be empty for preset geographies.
+          items: { type: string, minLength: 2, maxLength: 80 }
+        category: { type: ["string", "null"], maxLength: 120 }
+        pitchObjective: { type: ["string", "null"], maxLength: 500 }
+        productFocus: { type: ["string", "null"], maxLength: 180 }
+        preferredMedia: { type: ["string", "null"], enum: [bus, bus_shelter, both, null] }
+        targetQuantity: { type: ["integer", "null"], minimum: 1, maximum: 1000 }
+        stage:
+          type: string
+          enum: [research, explore, decide, plan, create, pitch]
+        status:
+          type: string
+          enum: [active, on_hold, completed]
+    DashboardSummary:
+      type: object
+      properties:
+        activeProjectCount: { type: integer }
+        totalProjectCount: { type: integer }
+        researchInProgressCount: { type: integer }
+        pitchReadyCount: { type: integer }
+        recentProjects:
+          type: array
+          items:
+            $ref: "#/components/schemas/PitchProject"
+      required: [activeProjectCount, totalProjectCount, researchInProgressCount, pitchReadyCount, recentProjects]
+    ResearchStatus:
+      type: object
+      properties:
+        state:
+          type: string
+          enum: [research_not_started, researching, awaiting_brand_confirmation, awaiting_competitor_review, research_complete, partial_success, needs_review, update_available]
+        lastResearched: { type: ["string", "null"], format: date-time }
+        lastAttemptedAt: { type: ["string", "null"], format: date-time }
+        liveResearchAvailable: { type: boolean }
+        currentRunId: { type: ["string", "null"], format: uuid }
+        currentStage: { type: ["string", "null"] }
+      required: [state, lastResearched, lastAttemptedAt, liveResearchAvailable]
+    ResearchIdentity:
+      type: object
+      properties:
+        enteredBrandName: { type: string }
+        canonicalBrandName: { type: ["string", "null"] }
+        officialWebsite: { type: ["string", "null"], format: uri }
+        regionalEntity: { type: ["string", "null"] }
+      required: [enteredBrandName, canonicalBrandName, officialWebsite, regionalEntity]
+    BrandCandidate:
+      type: object
+      properties:
+        name: { type: string }
+        website: { type: string, format: uri }
+        parent: { type: ["string", "null"] }
+        industry: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        evidenceQuote: { type: ["string", "null"] }
+        regionalEntity: { type: ["string", "null"] }
+        regionalEntityEvidenceQuote: { type: ["string", "null"] }
+      required: [name, website]
+    CompetitorCandidate:
+      type: object
+      properties:
+        name: { type: string }
+        selected: { type: boolean }
+        relevance: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+      required: [name, selected]
+    ResearchStage:
+      type: object
+      properties:
+        key: { type: string }
+        status: { type: string, enum: [pending, running, complete, needs_review, limited_evidence, failed] }
+        note: { type: ["string", "null"] }
+      required: [key, status]
+    ResearchRunDetails:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        scope: { type: string }
+        brand: { type: ["string", "null"] }
+        market: { type: ["string", "null"] }
+        focus: { type: ["string", "null"] }
+        status:
+          type: string
+          enum: [queued, running, awaiting_brand_confirmation, awaiting_competitor_review, partial_success, completed, failed]
+        stage: { type: string }
+        stages:
+          type: array
+          items: { $ref: "#/components/schemas/ResearchStage" }
+        brandCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/BrandCandidate" }
+        confirmedBrand:
+          oneOf:
+            - $ref: "#/components/schemas/BrandCandidate"
+            - type: "null"
+        enteredBrandName: { type: ["string", "null"] }
+        canonicalBrandName: { type: ["string", "null"] }
+        officialWebsite: { type: ["string", "null"], format: uri }
+        regionalEntity: { type: ["string", "null"] }
+        competitorCandidates:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitorCandidate" }
+        sourcesFound: { type: integer }
+        claimsGenerated: { type: integer }
+        providerUsage: { type: object, additionalProperties: true }
+        errorMessage: { type: ["string", "null"] }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: ["string", "null"], format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        coverageSnapshot:
+          oneOf:
+            - $ref: "#/components/schemas/QualityProjection"
+            - type: "null"
+        coverageSnapshotAt: { type: ["string", "null"], format: date-time }
+        coverageSnapshotStatus: { type: string, enum: [captured_at_completion, backfilled_before_retry, unavailable] }
+      required: [id, projectId, scope, brand, market, focus, status, stage, stages, brandCandidates, confirmedBrand, enteredBrandName, canonicalBrandName, officialWebsite, regionalEntity, competitorCandidates, sourcesFound, claimsGenerated, providerUsage, errorMessage, requestedAt, startedAt, completedAt, coverageSnapshot, coverageSnapshotAt, coverageSnapshotStatus]
+    BrandConfirmationInput:
+      type: object
+      properties:
+        website: { type: string, format: uri }
+      required: [website]
+    CompetitorSelectionInput:
+      type: object
+      properties:
+        names:
+          type: array
+          maxItems: 10
+          items: { type: string, minLength: 2, maxLength: 120 }
+      required: [names]
+    ResearchRetryInput:
+      type: object
+      properties:
+        stages:
+          type: array
+          minItems: 1
+          items: { type: string }
+      required: [stages]
+    ClaimReviewInput:
+      type: object
+      properties:
+        decision: { type: string, enum: [approved, rejected, needs_review] }
+        additionalSourceUrl: { type: ["string", "null"], format: uri, maxLength: 2048 }
+        researchNote: { type: ["string", "null"], maxLength: 4000 }
+        sourceQuote: { type: ["string", "null"], minLength: 20, maxLength: 4000 }
+      required: [decision]
+    ClaimReview:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        claimId: { type: string, format: uuid }
+        decision: { type: string, enum: [approved, rejected, needs_review] }
+        researchNote: { type: ["string", "null"] }
+        additionalSourceUrl: { type: ["string", "null"], format: uri }
+        verifiedSourceTitle: { type: ["string", "null"] }
+        verifiedSourcePublisher: { type: ["string", "null"] }
+        verifiedSourcePublishedAt: { type: ["string", "null"], format: date-time }
+        sourceVerifiedAt: { type: ["string", "null"], format: date-time }
+        sourceQuote: { type: ["string", "null"] }
+        quoteVerifiedAt: { type: ["string", "null"], format: date-time }
+        originalClaim: { type: string }
+        reviewedAt: { type: string, format: date-time }
+      required: [id, projectId, claimId, decision, researchNote, additionalSourceUrl, verifiedSourceTitle, verifiedSourcePublisher, verifiedSourcePublishedAt, sourceVerifiedAt, sourceQuote, quoteVerifiedAt, originalClaim, reviewedAt]
+    IntelligenceSource:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        url: { type: ["string", "null"] }
+        publisher: { type: ["string", "null"] }
+        publishedAt: { type: ["string", "null"], format: date-time }
+        retrievedAt: { type: string, format: date-time }
+        qualityScore: { type: ["integer", "null"] }
+        sourceKind: { type: ["string", "null"] }
+      required: [id, title, url, publisher, publishedAt, retrievedAt]
+    IntelligenceClaim:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        claim: { type: string }
+        category: { type: string }
+        researchRunId: { type: ["string", "null"], format: uuid }
+        relatedBrand: { type: ["string", "null"] }
+        relatedCampaignId: { type: ["string", "null"], format: uuid }
+        relatedCompetitorId: { type: ["string", "null"], format: uuid }
+        methodology: { type: ["string", "null"] }
+        claimType:
+          type: string
+          enum: [verified_fact, reported_claim, estimate, ai_interpretation]
+        confidence:
+          type: string
+          enum: [confirmed, strongly_indicated, estimated, user_provided]
+        status:
+          type: string
+          enum: [draft, needs_review, approved, rejected, superseded]
+        isDemo: { type: boolean }
+        source:
+          oneOf:
+            - $ref: "#/components/schemas/IntelligenceSource"
+            - type: "null"
+      required: [id, claim, category, claimType, confidence, status, isDemo, source]
+    IntelligenceEntry:
+      type: object
+      properties:
+        key: { type: string }
+        label: { type: string }
+        value: { type: ["string", "null"] }
+        claimIds:
+          type: array
+          items: { type: string, format: uuid }
+        isDemo: { type: boolean }
+      required: [key, label, value, claimIds, isDemo]
+    EvidenceCoverage:
+      type: object
+      properties:
+        percentage: { type: integer, minimum: 0, maximum: 100 }
+        coveredCriteria: { type: array, items: { type: string } }
+        requiredCriteria: { type: array, items: { type: string } }
+        missingCriteria: { type: array, items: { type: string } }
+        gaps: { type: array, items: { type: string } }
+        retryStages: { type: array, items: { type: string } }
+        researchRunId: { type: ["string", "null"], format: uuid }
+        asOf: { type: string, format: date-time }
+        evidenceRunIds: { type: array, items: { type: string, format: uuid } }
+      required: [percentage, coveredCriteria, requiredCriteria, missingCriteria, gaps, retryStages, researchRunId, asOf, evidenceRunIds]
+    QualityProjection:
+      type: object
+      properties:
+        promotionSummary: { type: string, enum: [Confirmed Active, "No Verified Active Promotion", "Not researched"] }
+        researchRunId: { type: ["string", "null"], format: uuid }
+        asOf: { type: string, format: date-time }
+        evidenceRunIds: { type: array, items: { type: string, format: uuid } }
+        company: { $ref: "#/components/schemas/EvidenceCoverage" }
+        competitors: { $ref: "#/components/schemas/EvidenceCoverage" }
+        currentPromotion: { $ref: "#/components/schemas/EvidenceCoverage" }
+        ooh: { $ref: "#/components/schemas/EvidenceCoverage" }
+        campaign: { $ref: "#/components/schemas/EvidenceCoverage" }
+        strategy: { $ref: "#/components/schemas/EvidenceCoverage" }
+      required: [promotionSummary, researchRunId, asOf, evidenceRunIds, company, competitors, currentPromotion, ooh, campaign, strategy]
+    CompetitorIntelligence:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        positioning: { type: ["string", "null"] }
+        mainProducts: { type: ["string", "null"] }
+        recentMarketing: { type: ["string", "null"] }
+        outdoorActivity: { type: ["string", "null"] }
+        mainMessage: { type: ["string", "null"] }
+        strengths: { type: ["string", "null"] }
+        observableGaps: { type: ["string", "null"] }
+        currentPromotion: { type: ["string", "null"] }
+        doohActivity: { type: ["string", "null"] }
+        transitActivity: { type: ["string", "null"] }
+        evidenceClaimIds:
+          type: array
+          items: { type: string, format: uuid }
+        isDemo: { type: boolean }
+        verificationStatus: { type: string, enum: [Verified, Partially Verified, Insufficient Evidence] }
+        verificationEvidence:
+          type: object
+          properties:
+            officialIdentity: { type: boolean }
+            uaePresence: { type: boolean }
+            category: { type: boolean }
+            positioning: { type: boolean }
+            recentActivity: { type: boolean }
+          required: [officialIdentity, uaePresence, category, positioning, recentActivity]
+      required: [id, name, positioning, mainProducts, recentMarketing, outdoorActivity, mainMessage, strengths, observableGaps, currentPromotion, doohActivity, transitActivity, evidenceClaimIds, isDemo, verificationStatus, verificationEvidence]
+    CampaignIntelligence:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        brandOrProduct: { type: ["string", "null"] }
+        productFocus: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        endDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        geography: { type: ["string", "null"] }
+        message: { type: ["string", "null"] }
+        medium: { type: ["string", "null"] }
+        oohMediumType:
+          type: ["string", "null"]
+          enum: [Bus, Bus Shelter, Billboard, DOOH, Metro, Taxi, Airport, Mall, Street Furniture, null]
+        location: { type: ["string", "null"] }
+        referenceImageUrl: { type: ["string", "null"] }
+        source:
+          oneOf:
+            - $ref: "#/components/schemas/IntelligenceSource"
+            - type: "null"
+        confidence:
+          type: string
+          enum: [confirmed, strongly_indicated, estimated, user_provided]
+        isDemo: { type: boolean }
+        isCurrent: { type: boolean }
+        evidenceStatus:
+          type: string
+          enum: [confirmed_ooh, likely_ooh, insufficient_evidence]
+        promotionClassification:
+          type: string
+          enum: [Confirmed Active, Recently Active, Latest Identifiable Campaign, No Verified Active Promotion]
+        oohMediumClassification:
+          type: string
+          enum: [Bus, Bus Shelter, Billboard, DOOH, Metro, Taxi, Airport, Mall, Street Furniture, "OOH — medium unverified"]
+        oohMediumSourceQuote: { type: ["string", "null"] }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceSource" }
+      required: [id, name, brandOrProduct, productFocus, startDate, endDate, geography, message, medium, oohMediumType, location, referenceImageUrl, source, confidence, isDemo, isCurrent]
+    StrategyIntelligence:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        key: { type: string }
+        label: { type: string }
+        recommendation: { type: string }
+        rationale: { type: string }
+        evidenceClaimIds:
+          type: array
+          items: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [draft, approved, rejected, edited]
+        isDemo: { type: boolean }
+        researchRunId: { type: ["string", "null"], format: uuid }
+        evidenceStrength: { type: string, enum: [Strong, Limited] }
+      required: [id, key, label, recommendation, rationale, evidenceClaimIds, status, isDemo, evidenceStrength]
+    ProjectIntelligence:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        isDemo: { type: boolean }
+        sampleNotice: { type: ["string", "null"] }
+        status:
+          $ref: "#/components/schemas/ResearchStatus"
+        identity:
+          $ref: "#/components/schemas/ResearchIdentity"
+        company:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceEntry" }
+        market:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceEntry" }
+        marketing:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceEntry" }
+        claims:
+          type: array
+          items: { $ref: "#/components/schemas/IntelligenceClaim" }
+        competitors:
+          type: array
+          items: { $ref: "#/components/schemas/CompetitorIntelligence" }
+        campaigns:
+          type: array
+          items: { $ref: "#/components/schemas/CampaignIntelligence" }
+        strategy:
+          type: array
+          items: { $ref: "#/components/schemas/StrategyIntelligence" }
+        quality: { $ref: "#/components/schemas/QualityProjection" }
+      required: [projectId, isDemo, sampleNotice, status, identity, company, market, marketing, claims, competitors, campaigns, strategy, quality]
+    ProjectWorkspace:
+      type: object
+      properties:
+        project:
+          $ref: "#/components/schemas/PitchProject"
+        insight: { type: string }
+        marketSnapshot: { type: string }
+        competitorCount: { type: ["integer", "null"] }
+        lastKnownOohActivity: { type: ["string", "null"] }
+        recommendedMedia:
+          type: array
+          items: { type: string }
+        locationsSummary: { type: string }
+        opportunitySummary: { type: string }
+        demoNotice: { type: ["string", "null"] }
+      required: [project, insight, marketSnapshot, recommendedMedia, locationsSummary, opportunitySummary, demoNotice]
+    Conversation:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        title: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, title, createdAt, updatedAt]
+    ConversationMessage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        conversationId: { type: string, format: uuid }
+        role:
+          type: string
+          enum: [user, assistant]
+        content: { type: string }
+        isPlaceholder: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, conversationId, role, content, isPlaceholder, createdAt]
+    ConversationThread:
+      type: object
+      properties:
+        conversation:
+          $ref: "#/components/schemas/Conversation"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConversationMessage"
+      required: [conversation, messages]
+    ChatMessageInput:
+      type: object
+      properties:
+        content: { type: string, minLength: 1, maxLength: 4000 }
+      required: [content]
+    MessagePair:
+      type: object
+      properties:
+        userMessage:
+          $ref: "#/components/schemas/ConversationMessage"
+        assistantMessage:
+          $ref: "#/components/schemas/ConversationMessage"
+      required: [userMessage, assistantMessage]
+    InventoryAsset:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        assetCode: { type: string }
+        assetType: { type: string }
+        sourceFamily: { type: string }
+        sourceKey: { type: ["string", "null"] }
+        sourceSheet: { type: ["string", "null"] }
+        shelterNumber: { type: ["string", "null"] }
+        shelterConfiguration: { type: ["string", "null"] }
+        sourceMediaType: { type: ["string", "null"] }
+        powerStatus: { type: ["string", "null"] }
+        lightType: { type: ["string", "null"] }
+        accountability: { type: ["string", "null"] }
+        sourceBusRouteRaw: { type: ["string", "null"] }
+        stopName: { type: ["string", "null"] }
+        coordinatesRaw: { type: ["string", "null"] }
+        mupiRaw: { type: ["string", "null"] }
+        sourceMapLink: { type: ["string", "null"] }
+        tentativeClient: { type: ["string", "null"] }
+        currentClientRaw: { type: ["string", "null"] }
+        artworkRaw: { type: ["string", "null"] }
+        remarks: { type: ["string", "null"] }
+        campaignStartDateRaw: { type: ["string", "null"] }
+        campaignEndDateRaw: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        sourceLifecycleStatus: { type: string }
+        removedDetectedAt: { type: ["string", "null"], format: date-time }
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Last successful sync observation time, not a source-sheet last-edit timestamp.
+        sourceRecordHash: { type: ["string", "null"] }
+        syncReviewReasons: { type: array, items: { type: string } }
+        mediaUnits: { type: array, items: { $ref: "#/components/schemas/InventoryMediaUnit" } }
+        assetTypeOriginal: { type: ["string", "null"] }
+        assetSubtype: { type: ["string", "null"] }
+        assetName: { type: ["string", "null"] }
+        area: { type: ["string", "null"] }
+        areaOriginal: { type: ["string", "null"] }
+        areaNormalized: { type: ["string", "null"] }
+        road: { type: ["string", "null"] }
+        roadOriginal: { type: ["string", "null"] }
+        roadNormalized: { type: ["string", "null"] }
+        direction: { type: ["string", "null"] }
+        emirate: { type: ["string", "null"] }
+        routes: { type: array, items: { type: string } }
+        depot: { type: ["string", "null"] }
+        availability: { type: ["string", "null"] }
+        availabilityOriginal: { type: ["string", "null"] }
+        bookingStatus: { type: ["string", "null"] }
+        campaign: { type: ["string", "null"] }
+        client: { type: ["string", "null"] }
+        startDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        endDate: { type: ["string", "null"], pattern: '^\d{4}-\d{2}-\d{2}$' }
+        mediaFormat: { type: ["string", "null"] }
+        dimensions: { type: ["string", "null"] }
+        displayTechnology: { type: ["string", "null"], enum: [static, digital, null] }
+        latitude: { type: ["number", "null"], minimum: -90, maximum: 90 }
+        longitude: { type: ["number", "null"], minimum: -180, maximum: 180 }
+        rate: { type: ["string", "null"] }
+        photoPath: { type: ["string", "null"] }
+        mapUrl: { type: ["string", "null"], format: uri }
+        nearbyPois: { type: array, items: { type: string } }
+        audienceTags: { type: array, items: { type: string } }
+        trafficVisibility: { type: object, additionalProperties: true }
+        internalNotes: { type: ["string", "null"] }
+        sourceImportBatchId: { type: ["string", "null"], format: uuid }
+        tags: { type: array, items: { type: string } }
+        metadata: { type: object, additionalProperties: true }
+        qualityStates:
+          type: array
+          items: { type: string, enum: [complete, missing_coordinates, missing_photo, missing_availability, needs_review] }
+        locationUnavailable: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, assetCode, assetType, assetTypeOriginal, assetSubtype, assetName, area, areaOriginal, areaNormalized, road, roadOriginal, roadNormalized, direction, emirate, routes, depot, availability, availabilityOriginal, bookingStatus, campaign, client, startDate, endDate, mediaFormat, dimensions, displayTechnology, latitude, longitude, rate, photoPath, mapUrl, nearbyPois, audienceTags, trafficVisibility, internalNotes, sourceImportBatchId, tags, metadata, qualityStates, locationUnavailable, createdAt, updatedAt]
+    InventoryAssetPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/InventoryAsset" }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+      required: [items, total, limit, offset]
+    InventoryMediaUnit:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        parentInventoryAssetId: { type: string, format: uuid }
+        unitType: { type: string, enum: [TOP_PANEL, MUPI] }
+        format: { type: string, enum: [STATIC, DIGITAL] }
+        sourceType: { type: ["string", "null"] }
+        availabilityStatus: { type: string }
+        lifecycleStatus: { type: string }
+        currentClient: { type: ["string", "null"] }
+        campaignStart: { type: ["string", "null"] }
+        campaignEnd: { type: ["string", "null"] }
+        internalNotes: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, parentInventoryAssetId, unitType, format, sourceType, availabilityStatus, lifecycleStatus, currentClient, campaignStart, campaignEnd, internalNotes, createdAt, updatedAt]
+    InventorySyncChange:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        syncRunId: { type: string, format: uuid }
+        inventoryAssetId: { type: ["string", "null"], format: uuid }
+        sourceKey: { type: string }
+        changeType: { type: string }
+        changedFields: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }
+      required: [id, syncRunId, inventoryAssetId, sourceKey, changeType, changedFields, createdAt]
+    InventorySyncRun:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceFamily: { type: string }
+        status: { type: string }
+        trigger: { type: string }
+        sourceTitle: { type: ["string", "null"] }
+        sourceUrl: { type: ["string", "null"] }
+        sourceRows: { type: integer }
+        addedCount: { type: integer }
+        updatedCount: { type: integer }
+        unchangedCount: { type: integer }
+        removedCount: { type: integer }
+        missingCount: { type: integer }
+        reviewCount: { type: integer }
+        duplicateCount: { type: integer }
+        error: { type: ["string", "null"] }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: ["string", "null"], format: date-time }
+        changes: { type: array, items: { $ref: "#/components/schemas/InventorySyncChange" } }
+      required: [id, sourceFamily, status, trigger, sourceTitle, sourceUrl, sourceRows, addedCount, updatedCount, unchangedCount, removedCount, missingCount, reviewCount, duplicateCount, error, startedAt, completedAt]
+    InventorySyncStatus:
+      type: object
+      properties:
+        configured: { type: boolean }
+        connectionStatus: { type: string, enum: [not_configured, awaiting_first_sync, connected, error] }
+        sourceTitle: { type: ["string", "null"] }
+        lastSuccessfulSyncAt: { type: ["string", "null"], format: date-time }
+        isStale: { type: boolean }
+        refreshIntervalMinutes: { type: integer }
+        lastRun: { anyOf: [{ $ref: "#/components/schemas/InventorySyncRun" }, { type: "null" }] }
+      required: [configured, connectionStatus, sourceTitle, lastSuccessfulSyncAt, isStale, refreshIntervalMinutes, lastRun]
+    InventorySourceHealth:
+      type: object
+      properties:
+        activeSourceRecords: { type: integer }
+        removedRecords: { type: integer }
+        invalidCoordinates: { type: integer }
+        missingMediaType: { type: integer }
+        duplicateSourceKeys: { type: integer }
+        newAssets: { type: integer }
+        changedAssets: { type: integer }
+        missingFromSource: { type: integer }
+        singleCount: { type: integer }
+        doubleCount: { type: integer }
+        sourceRows: { type: integer }
+        importedRecords: { type: integer }
+        typeDistribution: { type: object, additionalProperties: { type: integer } }
+      required: [activeSourceRecords, removedRecords, invalidCoordinates, missingMediaType, duplicateSourceKeys, newAssets, changedAssets, missingFromSource, singleCount, doubleCount, sourceRows, importedRecords, typeDistribution]
+    InventoryImportInput:
+      type: object
+      properties:
+        fileName: { type: ["string", "null"], maxLength: 255 }
+        mapping:
+          type: object
+          additionalProperties: { type: string, maxLength: 200 }
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: object, additionalProperties: true }
+      required: [mapping, rows]
+    InventoryImportRowPreview:
+      type: object
+      properties:
+        rowIndex: { type: integer }
+        assetCode: { type: ["string", "null"] }
+        suggestedAction: { type: string, enum: [add, update, skip] }
+        requiresChoice: { type: boolean }
+        existingAssetId: { type: ["string", "null"], format: uuid }
+        issues: { type: array, items: { type: string } }
+      required: [rowIndex, assetCode, suggestedAction, requiresChoice, existingAssetId, issues]
+    InventoryImportPreview:
+      type: object
+      properties:
+        rowCount: { type: integer }
+        addCount: { type: integer }
+        updateCount: { type: integer }
+        invalidCount: { type: integer }
+        duplicateCount: { type: integer }
+        confirmable: { type: boolean }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/InventoryImportRowPreview" }
+      required: [rowCount, addCount, updateCount, invalidCount, duplicateCount, confirmable, rows]
+    InventoryImportRowDecision:
+      type: object
+      properties:
+        rowIndex: { type: integer, minimum: 0 }
+        action: { type: string, enum: [add, update, skip] }
+      required: [rowIndex, action]
+    InventoryImportCommitInput:
+      type: object
+      properties:
+        fileName: { type: ["string", "null"], maxLength: 255 }
+        mapping:
+          type: object
+          additionalProperties: { type: string, maxLength: 200 }
+        rows:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { type: object, additionalProperties: true }
+        decisions:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { $ref: "#/components/schemas/InventoryImportRowDecision" }
+      required: [mapping, rows, decisions]
+    InventoryImportBatch:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        fileName: { type: ["string", "null"] }
+        status: { type: string, enum: [committed] }
+        mapping: { type: object, additionalProperties: { type: string } }
+        rowCount: { type: integer }
+        addedCount: { type: integer }
+        updatedCount: { type: integer }
+        skippedCount: { type: integer }
+        createdAt: { type: string, format: date-time }
+      required: [id, fileName, status, mapping, rowCount, addedCount, updatedCount, skippedCount, createdAt]
+    InventoryQualitySummary:
+      type: object
+      properties:
+        totalAssets: { type: integer }
+        complete: { type: integer }
+        missingCoordinates: { type: integer }
+        missingPhoto: { type: integer }
+        missingAvailability: { type: integer }
+        needsReview: { type: integer }
+      required: [totalAssets, complete, missingCoordinates, missingPhoto, missingAvailability, needsReview]
+    NearbyInventoryAsset:
+      type: object
+      properties:
+        asset: { $ref: "#/components/schemas/InventoryAsset" }
+        distanceMeters: { type: number, minimum: 0 }
+      required: [asset, distanceMeters]
+    ProjectInventorySelectionInput:
+      type: object
+      properties:
+        status: { type: string, enum: [shortlist, selected, rejected] }
+        note: { type: ["string", "null"], maxLength: 4000 }
+      required: [status]
+    ProjectInventorySelection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        inventoryAssetId: { type: string, format: uuid }
+        inventoryMediaUnitId: { type: ["string", "null"], format: uuid }
+        status: { type: string, enum: [shortlist, selected, rejected] }
+        note: { type: ["string", "null"] }
+        asset: { $ref: "#/components/schemas/InventoryAsset" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, inventoryAssetId, inventoryMediaUnitId, status, note, asset, createdAt, updatedAt]
+    BusRouteSourceVariant:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sourceIdentity: { type: string }
+        sheetName: { type: string }
+        sourceRowNumber: { type: integer }
+        allocatedBusCount: { type: ["integer", "null"], minimum: 0 }
+        from: { type: ["string", "null"] }
+        to: { type: ["string", "null"] }
+        via: { type: ["string", "null"] }
+        depot: { type: ["string", "null"] }
+        sourceBusCount: { type: ["integer", "null"], minimum: 0 }
+        sourceSheet: { type: string }
+        sourceRow: { type: integer }
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Last successful sync observation time, not a source-sheet last-edit timestamp.
+        originalSourceData: { type: object, additionalProperties: true }
+        rawData: { type: object, additionalProperties: true }
+      required: [id, sourceIdentity, sheetName, sourceRowNumber, allocatedBusCount, from, to, via, depot, sourceBusCount, sourceSheet, sourceRow, lastSeenAt, originalSourceData, rawData]
+    BusRoute:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        routeId: { type: string }
+        normalizedRouteId: { type: string }
+        isActive: { type: boolean }
+        sourceRowCount: { type: integer }
+        depots: { type: array, items: { type: string } }
+        variants: { type: array, items: { $ref: "#/components/schemas/BusRouteSourceVariant" } }
+      required: [id, routeId, normalizedRouteId, isActive, sourceRowCount, depots, variants]
+    BusRoutePage:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/BusRoute" } }
+        total: { type: integer }
+        limit: { type: integer }
+        offset: { type: integer }
+      required: [items, total, limit, offset]
+    BusRouteDetail:
+      allOf:
+        - $ref: "#/components/schemas/BusRoute"
+    BusRouteSyncRun:
+      type: object
+      properties:
+        id: { type: ["string", "null"], format: uuid }
+        status: { type: string, enum: [RUNNING, SUCCESS, FAILED] }
+        trigger: { type: string }
+        sourceTitle: { type: ["string", "null"] }
+        discoveredSheets: { type: array, items: { $ref: "#/components/schemas/BusRouteDiscoveredSheet" } }
+        skippedSheets: { type: array, items: { type: string } }
+        sourceRows: { type: integer }
+        distinctRoutes: { type: integer }
+        addedCount: { type: integer }
+        updatedCount: { type: integer }
+        unchangedCount: { type: integer }
+        inactiveCount: { type: integer }
+        error: { type: ["string", "null"] }
+        startedAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time }
+      required: [id, status, trigger, sourceTitle, discoveredSheets, skippedSheets, sourceRows, distinctRoutes, addedCount, updatedCount, unchangedCount, inactiveCount, error, startedAt, completedAt]
+    BusRouteDiscoveredSheet:
+      type: object
+      properties:
+        name: { type: string }
+        kind: { type: string, enum: [route, vehicle] }
+        dataRows: { type: integer }
+        headers: { type: array, items: { type: string } }
+      required: [name, kind, dataRows, headers]
+    BusRoutesHealth:
+      type: object
+      properties:
+        validSourceRows: { type: integer }
+        distinctRouteIds: { type: integer }
+        duplicateRouteIds: { type: integer }
+        missingFromCount: { type: integer }
+        missingToCount: { type: integer }
+        missingViaCount: { type: integer }
+        missingDepotCount: { type: integer }
+        missingSourceBusCount: { type: integer }
+        missingFromSourceRoutes: { type: integer }
+        inactiveRoutes:
+          type: array
+          items: { $ref: "#/components/schemas/InactiveBusRoute" }
+        selectedMissingVariants:
+          type: array
+          items: { $ref: "#/components/schemas/SelectedMissingBusRouteVariant" }
+        lastSuccessfulSyncAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Completion time of the latest successful bus-route sync, independent of a later failed attempt.
+        lastSync:
+          oneOf:
+            - $ref: "#/components/schemas/BusRouteSyncRun"
+            - type: "null"
+      required: [validSourceRows, distinctRouteIds, duplicateRouteIds, missingFromCount, missingToCount, missingViaCount, missingDepotCount, missingSourceBusCount, missingFromSourceRoutes, inactiveRoutes, selectedMissingVariants, lastSuccessfulSyncAt, lastSync]
+    InactiveBusRoute:
+      type: object
+      properties:
+        routeId: { type: string }
+        normalizedRouteId: { type: string }
+        lastSeenAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Last successful sync observation time, not a source-sheet last-edit timestamp.
+      required: [routeId, normalizedRouteId, lastSeenAt]
+    SelectedMissingBusRouteVariant:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        selectionId: { type: string, format: uuid }
+        routeId: { type: string }
+        depot: { type: ["string", "null"] }
+        sourceSheet: { type: string }
+        sourceRow: { type: integer }
+        proposedQuantity: { type: integer }
+        selectionStatus: { type: string, enum: [PROPOSED, SHORTLISTED, REJECTED] }
+        healthStatus: { type: string, enum: [MISSING_FROM_SOURCE] }
+      required: [projectId, selectionId, routeId, depot, sourceSheet, sourceRow, proposedQuantity, selectionStatus, healthStatus]
+    ProjectBusRouteSelectionInput:
+      type: object
+      properties:
+        sourceVariantId: { type: string, format: uuid }
+        proposedQuantity: { type: integer, minimum: 1 }
+        status: { type: string, enum: [PROPOSED, SHORTLISTED, REJECTED] }
+        internalNote: { type: ["string", "null"], maxLength: 4000 }
+        overrideSourceCount: { type: boolean }
+        overrideReason: { type: ["string", "null"], maxLength: 2000 }
+      required: [sourceVariantId, proposedQuantity]
+    ProjectBusRouteSelectionUpdate:
+      type: object
+      properties:
+        proposedQuantity: { type: integer, minimum: 1 }
+        status: { type: string, enum: [PROPOSED, SHORTLISTED, REJECTED] }
+        internalNote: { type: ["string", "null"], maxLength: 4000 }
+        overrideSourceCount: { type: boolean }
+        overrideReason: { type: ["string", "null"], maxLength: 2000 }
+    ProjectBusRouteSelection:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        projectId: { type: string, format: uuid }
+        sourceVariantId: { type: string, format: uuid }
+        routeId: { type: string }
+        from: { type: ["string", "null"] }
+        to: { type: ["string", "null"] }
+        via: { type: ["string", "null"] }
+        depot: { type: ["string", "null"] }
+        sourceBusCount: { type: ["integer", "null"] }
+        sourceSheet: { type: string }
+        sourceRow: { type: integer }
+        lastSeenAt: { type: ["string", "null"], format: date-time }
+        originalSourceData: { type: object, additionalProperties: true }
+        isSourceActive: { type: boolean }
+        campaignGeographyStatus: { $ref: "#/components/schemas/CampaignGeographyStatus" }
+        proposedQuantity: { type: integer }
+        requiresOverride:
+          type: boolean
+          description: True when the current source count is missing/too low and the saved override does not cover the current count snapshot.
+        status: { type: string, enum: [PROPOSED, SHORTLISTED, REJECTED] }
+        internalNote: { type: ["string", "null"] }
+        overrideSourceCount: { type: boolean }
+        overrideReason: { type: ["string", "null"] }
+        overrideAt: { type: ["string", "null"], format: date-time }
+        overrideCountSnapshot: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+      required: [id, projectId, sourceVariantId, routeId, from, to, via, depot, sourceBusCount, sourceSheet, sourceRow, lastSeenAt, originalSourceData, isSourceActive, campaignGeographyStatus, proposedQuantity, requiresOverride, status, internalNote, overrideSourceCount, overrideReason, overrideAt, overrideCountSnapshot, createdAt, updatedAt]
+    ProjectBusPlan:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        selections: { type: array, items: { $ref: "#/components/schemas/ProjectBusRouteSelection" } }
+        totalProposedBuses: { type: integer }
+      required: [projectId, selections, totalProposedBuses]
+    BusPlanOverrideRequired:
+      type: object
+      properties:
+        error: { type: string }
+        requiresOverride: { type: boolean, const: true }
+        sourceBusCount: { type: ["integer", "null"] }
+      required: [error, requiresOverride, sourceBusCount]
+    ApiError:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+    CampaignGeographyStatus:
+      type: string
+      enum: [IN_CAMPAIGN_GEOGRAPHY, OUTSIDE_CAMPAIGN_GEOGRAPHY, UNVERIFIED_CAMPAIGN_GEOGRAPHY]
+    ProjectShelterMediaSelection:
+      type: object
+      properties:
+        selectionId: { type: string, format: uuid }
+        inventoryAssetId: { type: string, format: uuid }
+        inventoryMediaUnitId: { type: ["string", "null"], format: uuid }
+        status: { type: string, enum: [shortlist, selected, rejected] }
+        note: { type: ["string", "null"] }
+        assetCode: { type: string }
+        assetType: { type: string }
+        assetName: { type: ["string", "null"] }
+        area: { type: ["string", "null"], description: Source-backed inventory area used to evaluate campaign geography overlap. }
+        campaignGeographyStatus: { $ref: "#/components/schemas/CampaignGeographyStatus" }
+        mediaUnitType: { type: ["string", "null"] }
+        mediaFormat: { type: ["string", "null"] }
+        currentClient: { type: ["string", "null"] }
+        availabilityStatus: { type: ["string", "null"] }
+        campaignStart: { type: ["string", "null"], format: date }
+        campaignEnd: { type: ["string", "null"], format: date }
+      required: [selectionId, inventoryAssetId, inventoryMediaUnitId, status, note, assetCode, assetType, assetName, area, campaignGeographyStatus, mediaUnitType, mediaFormat, currentClient, availabilityStatus, campaignStart, campaignEnd]
+    ProjectMediaPlan:
+      type: object
+      properties:
+        projectId: { type: string, format: uuid }
+        shelterSelections:
+          type: array
+          description: Exact BUS_SHELTER selections not marked rejected.
+          items: { $ref: "#/components/schemas/ProjectShelterMediaSelection" }
+        rejectedShelterSelections:
+          type: array
+          description: Exact BUS_SHELTER selections marked rejected, reported separately from proposed media.
+          items: { $ref: "#/components/schemas/ProjectShelterMediaSelection" }
+        busPlan: { $ref: "#/components/schemas/ProjectBusPlan" }
+        totalProposedBuses: { type: integer }
+      required: [projectId, shelterSelections, rejectedShelterSelections, busPlan, totalProposedBuses]
+    BusRoutesStatus:
+      type: object
+      properties:
+        configured: { type: boolean }
+        connected: { type: boolean }
+        physicalVehicleSourceConfigured: { type: boolean }
+        requiredTitle: { type: string }
+        spreadsheetTitle: { type: ["string", "null"] }
+        availableSheets: { type: array, items: { type: string } }
+        activeRouteCount: { type: integer }
+        lastRun:
+          oneOf:
+            - $ref: "#/components/schemas/BusRouteSyncRun"
+            - type: "null"
+        lastSuccessfulSyncAt:
+          type: ["string", "null"]
+          format: date-time
+          description: Completion time of the latest successful bus-route sync, independent of a later failed attempt.
+        error: { type: ["string", "null"] }
+      required: [configured, connected, physicalVehicleSourceConfigured, requiredTitle, spreadsheetTitle, availableSheets, activeRouteCount, lastRun, lastSuccessfulSyncAt, error]
+    ShelterSyncConflict:
+      type: object
+      properties:
+        sourceKey: { type: string }
+        sheet: { type: string }
+        shelterNumber: { type: string }
+        rows:
+          type: array
+          items: { $ref: "#/components/schemas/ShelterConflictRow" }
+        resolutionOptions: { type: array, items: { type: string } }
+      required: [sourceKey, sheet, shelterNumber, rows, resolutionOptions]
+    ShelterConflictRow:
+      type: object
+      properties:
+        sourceRow: { type: integer }
+        area: { type: ["string", "null"] }
+        stopName: { type: ["string", "null"] }
+        coordinates: { type: ["string", "null"] }
+        type: { type: ["string", "null"] }
+        accountability: { type: ["string", "null"] }
+        removalStatus: { type: string }
+        client: { type: ["string", "null"] }
+        remarks: { type: ["string", "null"] }
+      required: [sourceRow, area, stopName, coordinates, type, accountability, removalStatus, client, remarks]

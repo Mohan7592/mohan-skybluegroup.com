@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Pitch Intelligence Workspace"
+description = "A collaborative research and planning workspace for Dubai out-of-home media sales teams to create, revisit, and develop client pitch projects."
+version = "1.0.0"
+id = "artifacts/pitch-intelligence"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25802
+
+[services.development]
+run = "pnpm --filter @workspace/pitch-intelligence run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/pitch-intelligence", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/pitch-intelligence/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25802"
+BASE_PATH = "/"
