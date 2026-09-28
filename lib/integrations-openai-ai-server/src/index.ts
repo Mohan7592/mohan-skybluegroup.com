@@ -1,1 +1,1 @@
-export { openai } from "./client";
+export { getOpenAI, isOpenAIConfigured } from "./client";

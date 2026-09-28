@@ -1013,15 +1013,24 @@ function AssetProjectActions({ projectId, assetId, selection }: { projectId: str
     }
   };
 
+  const isInactive = selection?.inventoryStatus === "INACTIVE_REMOVED";
+
   return (
     <div className="space-y-4 bg-slate-50 dark:bg-slate-900 -mx-4 px-4 py-4 border-y">
+      {isInactive && (
+        <div role="status" data-testid="text-inactive-inventory" className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300">
+          <strong>{selection.inventoryStatusLabel}</strong>
+          {selection.inventoryStatusReason && <span className="block">{selection.inventoryStatusReason}</span>}
+          <span className="block">Kept for project history; not counted in the media plan. It can only be marked rejected or removed.</span>
+        </div>
+      )}
       <div className="flex gap-2">
         <Button
           variant={selection?.status === 'shortlist' ? "default" : "outline"}
           size="sm"
           className="flex-1 bg-amber-500 hover:bg-amber-600 text-white border-none"
           onClick={() => handleSetStatus("shortlist")}
-          disabled={setSelection.isPending}
+          disabled={setSelection.isPending || isInactive}
         >
           <Clock className="h-3 w-3 mr-1" /> Shortlist
         </Button>
@@ -1030,7 +1039,7 @@ function AssetProjectActions({ projectId, assetId, selection }: { projectId: str
           size="sm"
           className="flex-1 bg-green-600 hover:bg-green-700 text-white border-none"
           onClick={() => handleSetStatus("selected")}
-          disabled={setSelection.isPending}
+          disabled={setSelection.isPending || isInactive}
         >
           <Check className="h-3 w-3 mr-1" /> Select
         </Button>
@@ -1116,8 +1125,16 @@ function MediaUnitProjectActions({ projectId, assetId, unitId, selection }: { pr
     });
   };
 
+  const isInactive = selection?.inventoryStatus === "INACTIVE_REMOVED";
+
   return (
-    <div className="flex items-center gap-1 mt-2">
+    <div className="mt-2">
+    {isInactive && (
+      <div role="status" className="mb-1 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] text-rose-800 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300" title={selection.inventoryStatusReason ?? undefined}>
+        {selection.inventoryStatusLabel} · not counted
+      </div>
+    )}
+    <div className="flex items-center gap-1">
       {selection && (
         <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-50 hover:opacity-100 shrink-0" onClick={handleRemove} title="Remove Selection">
           <XCircle className="h-3 w-3" />
@@ -1129,6 +1146,7 @@ function MediaUnitProjectActions({ projectId, assetId, unitId, selection }: { pr
           size="sm"
           className={`flex-1 h-6 text-[10px] px-1 ${selection?.status === 'shortlist' ? 'bg-amber-500 hover:bg-amber-600' : ''}`}
           onClick={() => handleSetStatus('shortlist')}
+          disabled={isInactive}
         >
           <Clock className="h-3 w-3 mr-1" /> Shortlist
         </Button>
@@ -1137,6 +1155,7 @@ function MediaUnitProjectActions({ projectId, assetId, unitId, selection }: { pr
           size="sm"
           className={`flex-1 h-6 text-[10px] px-1 ${selection?.status === 'selected' ? 'bg-green-600 hover:bg-green-700' : ''}`}
           onClick={() => handleSetStatus('selected')}
+          disabled={isInactive}
         >
           <Check className="h-3 w-3 mr-1" /> Select
         </Button>
@@ -1149,6 +1168,7 @@ function MediaUnitProjectActions({ projectId, assetId, unitId, selection }: { pr
           <X className="h-3 w-3 mr-1" /> Reject
         </Button>
       </div>
+    </div>
     </div>
   );
 }

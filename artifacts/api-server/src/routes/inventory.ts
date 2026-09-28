@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { evaluateInventoryEligibility } from "../lib/inventory-eligibility";
 import { and, arrayOverlaps, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   CommitInventoryImportBody,
@@ -454,15 +455,22 @@ router.get("/projects/:projectId/inventory", async (req, res): Promise<void> => 
   const selectionRows = await db.select({
     selection: projectInventorySelectionsTable,
     asset: inventoryAssetsTable,
+    unit: inventoryMediaUnitsTable,
   }).from(projectInventorySelectionsTable)
     .innerJoin(inventoryAssetsTable, eq(projectInventorySelectionsTable.inventoryAssetId, inventoryAssetsTable.id))
+    .leftJoin(inventoryMediaUnitsTable, and(
+      eq(projectInventorySelectionsTable.inventoryMediaUnitId, inventoryMediaUnitsTable.id),
+      eq(inventoryMediaUnitsTable.parentInventoryAssetId, inventoryAssetsTable.id),
+    ))
     .where(eq(projectInventorySelectionsTable.projectId, params.data.projectId))
     .orderBy(desc(projectInventorySelectionsTable.updatedAt))
     .limit(500);
   const units = await mediaByAssetIds([...new Set(selectionRows.map(({ asset }) => asset.id))]);
-  res.json(ListProjectInventorySelectionsResponse.parse(selectionRows.map(({ selection, asset }) => ({
+  // Historical selections are preserved; non-current inventory is flagged, never hidden or deleted.
+  res.json(ListProjectInventorySelectionsResponse.parse(selectionRows.map(({ selection, asset, unit }) => ({
     ...selection,
     asset: { ...withQuality(asset), mediaUnits: units.get(asset.id) ?? [] },
+    ...evaluateInventoryEligibility(asset, unit, selection.inventoryMediaUnitId !== null),
   }))));
 });
 
@@ -483,11 +491,30 @@ router.put("/projects/:projectId/inventory/:assetId", async (req, res): Promise<
     res.status(404).json({ error: "Project not found" });
     return;
   }
-  const [asset] = await db.select({ id: inventoryAssetsTable.id }).from(inventoryAssetsTable)
-    .where(and(eq(inventoryAssetsTable.id, params.data.assetId), eq(inventoryAssetsTable.isActive, true)));
+  const [asset] = await db.select({
+    id: inventoryAssetsTable.id,
+    isActive: inventoryAssetsTable.isActive,
+    sourceLifecycleStatus: inventoryAssetsTable.sourceLifecycleStatus,
+  }).from(inventoryAssetsTable)
+    .where(eq(inventoryAssetsTable.id, params.data.assetId));
   if (!asset) {
     res.status(404).json({ error: "Inventory asset not found" });
     return;
+  }
+  const eligibility = evaluateInventoryEligibility(asset, null);
+  if (eligibility.inventoryStatus !== "CURRENT") {
+    // A historical selection may only be marked rejected; it can never be (re)proposed.
+    const [existing] = body.data.status === "rejected"
+      ? await db.select({ id: projectInventorySelectionsTable.id }).from(projectInventorySelectionsTable).where(and(
+        eq(projectInventorySelectionsTable.projectId, params.data.projectId),
+        eq(projectInventorySelectionsTable.inventoryAssetId, params.data.assetId),
+        isNull(projectInventorySelectionsTable.inventoryMediaUnitId),
+      ))
+      : [];
+    if (!existing) {
+      res.status(409).json({ error: `${eligibility.inventoryStatusLabel}: ${eligibility.inventoryStatusReason} It cannot be added to a media plan.` });
+      return;
+    }
   }
   const [selection] = await db.insert(projectInventorySelectionsTable).values({
     projectId: params.data.projectId,
@@ -508,6 +535,7 @@ router.put("/projects/:projectId/inventory/:assetId", async (req, res): Promise<
   res.json(SetProjectInventorySelectionResponse.parse({
     ...selection,
     asset: { ...withQuality(selectedAsset!), mediaUnits: (await mediaByAssetIds([selectedAsset!.id])).get(selectedAsset!.id) ?? [] },
+    ...evaluateInventoryEligibility(selectedAsset!, null),
   }));
 });
 
@@ -520,14 +548,27 @@ router.put("/projects/:projectId/inventory/:assetId/units/:unitId", async (req, 
     return;
   }
   const [project] = await db.select({ id: pitchProjectsTable.id }).from(pitchProjectsTable).where(eq(pitchProjectsTable.id, params.data.projectId));
-  const [asset] = await db.select().from(inventoryAssetsTable).where(and(eq(inventoryAssetsTable.id, params.data.assetId), eq(inventoryAssetsTable.isActive, true)));
+  const [asset] = await db.select().from(inventoryAssetsTable).where(eq(inventoryAssetsTable.id, params.data.assetId));
   const [unit] = await db.select().from(inventoryMediaUnitsTable).where(and(
     eq(inventoryMediaUnitsTable.id, unitId), eq(inventoryMediaUnitsTable.parentInventoryAssetId, params.data.assetId),
-    eq(inventoryMediaUnitsTable.lifecycleStatus, "ACTIVE"),
   ));
   if (!project || !asset || !unit) {
-    res.status(404).json({ error: "Project or active media unit not found" });
+    res.status(404).json({ error: "Project or media unit not found" });
     return;
+  }
+  const eligibility = evaluateInventoryEligibility(asset, unit, true);
+  if (eligibility.inventoryStatus !== "CURRENT") {
+    // A historical selection may only be marked rejected; it can never be (re)proposed.
+    const [existing] = body.data.status === "rejected"
+      ? await db.select({ id: projectInventorySelectionsTable.id }).from(projectInventorySelectionsTable).where(and(
+        eq(projectInventorySelectionsTable.projectId, params.data.projectId),
+        eq(projectInventorySelectionsTable.inventoryMediaUnitId, unit.id),
+      ))
+      : [];
+    if (!existing) {
+      res.status(409).json({ error: `${eligibility.inventoryStatusLabel}: ${eligibility.inventoryStatusReason} It cannot be added to a media plan.` });
+      return;
+    }
   }
   const [selection] = await db.insert(projectInventorySelectionsTable).values({
     projectId: params.data.projectId, inventoryAssetId: asset.id, inventoryMediaUnitId: unit.id,
@@ -539,6 +580,7 @@ router.put("/projects/:projectId/inventory/:assetId/units/:unitId", async (req, 
   const units = await mediaByAssetIds([asset.id]);
   res.json(SetProjectInventorySelectionResponse.parse({
     ...selection, asset: { ...withQuality(asset), mediaUnits: units.get(asset.id) ?? [] },
+    ...eligibility,
   }));
 });
 

@@ -1068,6 +1068,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProjectInventorySelection" }
         "404": { description: Project or asset not found }
+        "409": { description: Asset is inactive or removed from current inventory and cannot be newly added, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
     delete:
       operationId: removeProjectInventorySelection
       tags: [inventory]
@@ -1099,6 +1100,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ProjectInventorySelection" }
         "404": { description: Unit or project not found }
+        "409": { description: Shelter or media unit is inactive or removed from current inventory and cannot be newly added, content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } } }
     delete:
       operationId: removeProjectInventoryUnitSelection
       tags: [inventory]
@@ -2731,9 +2733,12 @@ components:
         status: { type: string, enum: [shortlist, selected, rejected] }
         note: { type: ["string", "null"] }
         asset: { $ref: "#/components/schemas/InventoryAsset" }
+        inventoryStatus: { $ref: "#/components/schemas/CurrentInventoryStatus" }
+        inventoryStatusLabel: { type: ["string", "null"], description: "Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'." }
+        inventoryStatusReason: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
-      required: [id, projectId, inventoryAssetId, inventoryMediaUnitId, status, note, asset, createdAt, updatedAt]
+      required: [id, projectId, inventoryAssetId, inventoryMediaUnitId, status, note, asset, inventoryStatus, inventoryStatusLabel, inventoryStatusReason, createdAt, updatedAt]
     BusRouteSourceVariant:
       type: object
       properties:
@@ -2923,6 +2928,10 @@ components:
       properties:
         error: { type: string }
       required: [error]
+    CurrentInventoryStatus:
+      type: string
+      enum: [CURRENT, INACTIVE_REMOVED]
+      description: CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.
     CampaignGeographyStatus:
       type: string
       enum: [IN_CAMPAIGN_GEOGRAPHY, OUTSIDE_CAMPAIGN_GEOGRAPHY, UNVERIFIED_CAMPAIGN_GEOGRAPHY]
@@ -2945,22 +2954,29 @@ components:
         availabilityStatus: { type: ["string", "null"] }
         campaignStart: { type: ["string", "null"], format: date }
         campaignEnd: { type: ["string", "null"], format: date }
-      required: [selectionId, inventoryAssetId, inventoryMediaUnitId, status, note, assetCode, assetType, assetName, area, campaignGeographyStatus, mediaUnitType, mediaFormat, currentClient, availabilityStatus, campaignStart, campaignEnd]
+        inventoryStatus: { $ref: "#/components/schemas/CurrentInventoryStatus" }
+        inventoryStatusLabel: { type: ["string", "null"], description: "Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'." }
+        inventoryStatusReason: { type: ["string", "null"] }
+      required: [selectionId, inventoryAssetId, inventoryMediaUnitId, status, note, assetCode, assetType, assetName, area, campaignGeographyStatus, mediaUnitType, mediaFormat, currentClient, availabilityStatus, campaignStart, campaignEnd, inventoryStatus, inventoryStatusLabel, inventoryStatusReason]
     ProjectMediaPlan:
       type: object
       properties:
         projectId: { type: string, format: uuid }
         shelterSelections:
           type: array
-          description: Exact BUS_SHELTER selections not marked rejected.
+          description: Exact BUS_SHELTER selections not marked rejected and still in current inventory. Only these count toward proposal totals.
           items: { $ref: "#/components/schemas/ProjectShelterMediaSelection" }
         rejectedShelterSelections:
           type: array
           description: Exact BUS_SHELTER selections marked rejected, reported separately from proposed media.
           items: { $ref: "#/components/schemas/ProjectShelterMediaSelection" }
+        inactiveShelterSelections:
+          type: array
+          description: Historical non-rejected BUS_SHELTER selections whose shelter or media unit is no longer in current inventory. Preserved and flagged; never counted toward proposal totals.
+          items: { $ref: "#/components/schemas/ProjectShelterMediaSelection" }
         busPlan: { $ref: "#/components/schemas/ProjectBusPlan" }
         totalProposedBuses: { type: integer }
-      required: [projectId, shelterSelections, rejectedShelterSelections, busPlan, totalProposedBuses]
+      required: [projectId, shelterSelections, rejectedShelterSelections, inactiveShelterSelections, busPlan, totalProposedBuses]
     BusRoutesStatus:
       type: object
       properties:

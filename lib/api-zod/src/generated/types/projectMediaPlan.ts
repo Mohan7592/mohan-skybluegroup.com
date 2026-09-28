@@ -10,10 +10,12 @@ import type { ProjectShelterMediaSelection } from './projectShelterMediaSelectio
 
 export interface ProjectMediaPlan {
   projectId: string;
-  /** Exact BUS_SHELTER selections not marked rejected. */
+  /** Exact BUS_SHELTER selections not marked rejected and still in current inventory. Only these count toward proposal totals. */
   shelterSelections: ProjectShelterMediaSelection[];
   /** Exact BUS_SHELTER selections marked rejected, reported separately from proposed media. */
   rejectedShelterSelections: ProjectShelterMediaSelection[];
+  /** Historical non-rejected BUS_SHELTER selections whose shelter or media unit is no longer in current inventory. Preserved and flagged; never counted toward proposal totals. */
+  inactiveShelterSelections: ProjectShelterMediaSelection[];
   busPlan: ProjectBusPlan;
   totalProposedBuses: number;
 }

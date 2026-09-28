@@ -2572,6 +2572,17 @@ export const ProjectInventorySelectionStatus = {
   rejected: 'rejected',
 } as const;
 
+/**
+ * CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.
+ */
+export type CurrentInventoryStatus = typeof CurrentInventoryStatus[keyof typeof CurrentInventoryStatus];
+
+
+export const CurrentInventoryStatus = {
+  CURRENT: 'CURRENT',
+  INACTIVE_REMOVED: 'INACTIVE_REMOVED',
+} as const;
+
 export interface ProjectInventorySelection {
   id: string;
   projectId: string;
@@ -2582,6 +2593,14 @@ export interface ProjectInventorySelection {
   /** @nullable */
   note: string | null;
   asset: InventoryAsset;
+  inventoryStatus: CurrentInventoryStatus;
+  /**
+     * Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'.
+     * @nullable
+     */
+  inventoryStatusLabel: string | null;
+  /** @nullable */
+  inventoryStatusReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -2915,14 +2934,24 @@ export interface ProjectShelterMediaSelection {
   campaignStart: string | null;
   /** @nullable */
   campaignEnd: string | null;
+  inventoryStatus: CurrentInventoryStatus;
+  /**
+     * Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'.
+     * @nullable
+     */
+  inventoryStatusLabel: string | null;
+  /** @nullable */
+  inventoryStatusReason: string | null;
 }
 
 export interface ProjectMediaPlan {
   projectId: string;
-  /** Exact BUS_SHELTER selections not marked rejected. */
+  /** Exact BUS_SHELTER selections not marked rejected and still in current inventory. Only these count toward proposal totals. */
   shelterSelections: ProjectShelterMediaSelection[];
   /** Exact BUS_SHELTER selections marked rejected, reported separately from proposed media. */
   rejectedShelterSelections: ProjectShelterMediaSelection[];
+  /** Historical non-rejected BUS_SHELTER selections whose shelter or media unit is no longer in current inventory. Preserved and flagged; never counted toward proposal totals. */
+  inactiveShelterSelections: ProjectShelterMediaSelection[];
   busPlan: ProjectBusPlan;
   totalProposedBuses: number;
 }

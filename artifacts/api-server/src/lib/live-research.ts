@@ -539,8 +539,8 @@ export function isLiveResearchConfigured(): boolean {
 
 async function getOpenAiClient() {
   if (!clientAvailability()) throw new Error("OpenAI AI Integrations are not configured");
-  const { openai } = await import("@workspace/integrations-openai-ai-server");
-  return openai;
+  const { getOpenAI } = await import("@workspace/integrations-openai-ai-server");
+  return getOpenAI();
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {

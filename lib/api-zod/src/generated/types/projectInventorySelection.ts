@@ -5,6 +5,7 @@
  * Project workspace API for the Pitch Intelligence Workspace
  * OpenAPI spec version: 0.1.0
  */
+import type { CurrentInventoryStatus } from './currentInventoryStatus';
 import type { InventoryAsset } from './inventoryAsset';
 import type { ProjectInventorySelectionStatus } from './projectInventorySelectionStatus';
 
@@ -18,6 +19,14 @@ export interface ProjectInventorySelection {
   /** @nullable */
   note: string | null;
   asset: InventoryAsset;
+  inventoryStatus: CurrentInventoryStatus;
+  /**
+     * Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'.
+     * @nullable
+     */
+  inventoryStatusLabel: string | null;
+  /** @nullable */
+  inventoryStatusReason: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
