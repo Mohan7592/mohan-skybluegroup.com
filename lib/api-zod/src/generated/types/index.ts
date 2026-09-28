@@ -51,6 +51,7 @@ export * from './conversationThread';
 export * from './createProject503';
 export * from './createProject503Recovery';
 export * from './createProject503RecoveryMethod';
+export * from './currentInventoryStatus';
 export * from './dashboardSummary';
 export * from './evidenceCoverage';
 export * from './findNearbyInventoryAssetsParams';

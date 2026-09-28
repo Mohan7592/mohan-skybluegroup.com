@@ -25,8 +25,11 @@ export function MediaPlanWorkspace({ projectId }: { projectId: string }) {
     );
   }
 
+  // Inactive rows are historical selections whose shelter/unit left current inventory.
+  // They are shown for audit but never counted in proposal totals.
   const allShelterSelections = [
     ...mediaPlan.shelterSelections,
+    ...mediaPlan.inactiveShelterSelections,
     ...mediaPlan.rejectedShelterSelections,
   ];
   const inScopeShelterCount = mediaPlan.shelterSelections
@@ -135,7 +138,14 @@ export function MediaPlanWorkspace({ projectId }: { projectId: string }) {
                   <TableBody>
                     {allShelterSelections.map((sel) => (
                       <TableRow key={sel.selectionId}>
-                        <TableCell className="font-medium text-sm">{sel.assetCode}</TableCell>
+                        <TableCell className="font-medium text-sm">
+                          {sel.assetCode}
+                          {sel.inventoryStatus === "INACTIVE_REMOVED" && (
+                            <span data-testid="text-inactive-inventory" className="block text-xs font-normal text-rose-700" title={sel.inventoryStatusReason ?? undefined}>
+                              {sel.inventoryStatusLabel}
+                            </span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-sm">
                           <div className="truncate max-w-[300px]" title={sel.assetName || ""}>{sel.assetName || "-"}</div>
                           <div className="text-xs text-muted-foreground">{sel.area || "Area unknown"}</div>
@@ -147,7 +157,7 @@ export function MediaPlanWorkspace({ projectId }: { projectId: string }) {
                             sel.status === 'shortlist' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                             'bg-rose-50 text-rose-700 border-rose-200'
                           }>
-                            {sel.status === "rejected" ? "REJECTED · not counted" : sel.status}
+                            {sel.status === "rejected" ? "REJECTED · not counted" : sel.inventoryStatus === "INACTIVE_REMOVED" ? `${sel.status} · not counted` : sel.status}
                           </Badge>
                           <Badge variant="outline" className="ml-1 text-[10px]">
                             {sel.campaignGeographyStatus.replaceAll("_", " ")}

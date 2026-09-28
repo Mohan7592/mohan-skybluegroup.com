@@ -8,8 +8,12 @@
     "./schema": "./src/schema/index.ts"
   },
   "scripts": {
-    "push": "drizzle-kit push --config ./drizzle.config.ts",
-    "push-force": "drizzle-kit push --force --config ./drizzle.config.ts"
+    "generate": "drizzle-kit generate --config ./drizzle.config.ts",
+    "migrate": "drizzle-kit migrate --config ./drizzle.config.ts",
+    "check": "drizzle-kit check --config ./drizzle.config.ts",
+    "baseline:verify": "node ./scripts/baseline-existing-db.mjs",
+    "baseline:commit": "node ./scripts/baseline-existing-db.mjs --commit",
+    "push:scratch-only": "drizzle-kit push --config ./drizzle.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

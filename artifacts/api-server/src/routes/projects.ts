@@ -32,6 +32,9 @@ import {
 } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+// SECURITY: no authentication/authorization exists yet. Every request acts as this single
+// workspace owner and owner_id is never checked. Internal/private deployment only; auth MUST be
+// implemented before any public or multi-user production deployment (see README "Security status").
 const DEMO_OWNER_ID = "11111111-1111-4111-8111-111111111111";
 
 export async function ensureWorkspaceOwner(): Promise<void> {

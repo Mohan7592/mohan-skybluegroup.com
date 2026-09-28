@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { evaluateInventoryEligibility } from "../lib/inventory-eligibility";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import {
   AddProjectBusRouteBody,
@@ -350,12 +351,18 @@ router.get("/projects/:projectId/media-plan", async (req, res): Promise<void> =>
       availabilityStatus: mediaUnit?.availabilityStatus ?? asset.availability,
       campaignStart: mediaUnit?.campaignStart ?? asset.startDate,
       campaignEnd: mediaUnit?.campaignEnd ?? asset.endDate,
+      ...evaluateInventoryEligibility(asset, mediaUnit, selection.inventoryMediaUnitId !== null),
     }));
-  const { proposedShelterSelections, rejectedShelterSelections } = partitionShelterSelections(mediaRows);
+  const {
+    proposedShelterSelections,
+    rejectedShelterSelections,
+    inactiveShelterSelections,
+  } = partitionShelterSelections(mediaRows);
   res.json(GetProjectMediaPlanResponse.parse({
     projectId: params.data.projectId,
     shelterSelections: proposedShelterSelections,
     rejectedShelterSelections,
+    inactiveShelterSelections,
     busPlan,
     totalProposedBuses: busPlan.totalProposedBuses,
   }));

@@ -5,7 +5,7 @@ import {
   conversationsTable, conversationMessagesTable,
 } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { getOpenAI } from "@workspace/integrations-openai-ai-server";
 import { answerInventoryQuestion, isInventoryQuestion } from "./inventory-copilot";
 import { answerBusRouteQuestion, isBusRouteReferenceQuestion } from "./bus-route-copilot";
 import { answerProjectBusPlanQuestion, isProjectBusPlanQuestion } from "./bus-plan-copilot";
@@ -344,7 +344,7 @@ export async function answerProjectQuestion(projectId: string, question: string)
   }));
   const selectedIdsByClaimId = new Map(selectedClaims.map((item) => [item.claim.id, item.id]));
   try {
-    const response = await openai.responses.create({
+    const response = await getOpenAI().responses.create({
       model: "gpt-5-mini",
       input: [
         {

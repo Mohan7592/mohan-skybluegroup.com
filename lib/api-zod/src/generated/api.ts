@@ -3937,8 +3937,11 @@ export const GetProjectMediaPlanResponse = zod.object({
   "currentClient": zod.string().nullable(),
   "availabilityStatus": zod.string().nullable(),
   "campaignStart": zod.coerce.date().nullable(),
-  "campaignEnd": zod.coerce.date().nullable()
-})).describe('Exact BUS_SHELTER selections not marked rejected.'),
+  "campaignEnd": zod.coerce.date().nullable(),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable()
+})).describe('Exact BUS_SHELTER selections not marked rejected and still in current inventory. Only these count toward proposal totals.'),
   "rejectedShelterSelections": zod.array(zod.object({
   "selectionId": zod.string().uuid(),
   "inventoryAssetId": zod.string().uuid(),
@@ -3955,8 +3958,32 @@ export const GetProjectMediaPlanResponse = zod.object({
   "currentClient": zod.string().nullable(),
   "availabilityStatus": zod.string().nullable(),
   "campaignStart": zod.coerce.date().nullable(),
-  "campaignEnd": zod.coerce.date().nullable()
+  "campaignEnd": zod.coerce.date().nullable(),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable()
 })).describe('Exact BUS_SHELTER selections marked rejected, reported separately from proposed media.'),
+  "inactiveShelterSelections": zod.array(zod.object({
+  "selectionId": zod.string().uuid(),
+  "inventoryAssetId": zod.string().uuid(),
+  "inventoryMediaUnitId": zod.string().uuid().nullable(),
+  "status": zod.enum(['shortlist', 'selected', 'rejected']),
+  "note": zod.string().nullable(),
+  "assetCode": zod.string(),
+  "assetType": zod.string(),
+  "assetName": zod.string().nullable(),
+  "area": zod.string().nullable().describe('Source-backed inventory area used to evaluate campaign geography overlap.'),
+  "campaignGeographyStatus": zod.enum(['IN_CAMPAIGN_GEOGRAPHY', 'OUTSIDE_CAMPAIGN_GEOGRAPHY', 'UNVERIFIED_CAMPAIGN_GEOGRAPHY']),
+  "mediaUnitType": zod.string().nullable(),
+  "mediaFormat": zod.string().nullable(),
+  "currentClient": zod.string().nullable(),
+  "availabilityStatus": zod.string().nullable(),
+  "campaignStart": zod.coerce.date().nullable(),
+  "campaignEnd": zod.coerce.date().nullable(),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable()
+})).describe('Historical non-rejected BUS_SHELTER selections whose shelter or media unit is no longer in current inventory. Preserved and flagged; never counted toward proposal totals.'),
   "busPlan": zod.object({
   "projectId": zod.string().uuid(),
   "selections": zod.array(zod.object({
@@ -4101,6 +4128,9 @@ export const ListProjectInventorySelectionsResponseItem = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -4226,6 +4256,9 @@ export const SetProjectInventorySelectionResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })
@@ -4362,6 +4395,9 @@ export const SetProjectInventoryUnitSelectionResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 }),
+  "inventoryStatus": zod.enum(['CURRENT', 'INACTIVE_REMOVED']).describe('CURRENT when the shelter (and selected media unit) is active in the current SkyBlue inventory. INACTIVE_REMOVED for historical selections whose shelter or unit was removed, deactivated or is missing from the latest source sync; these are preserved but never counted.'),
+  "inventoryStatusLabel": zod.string().nullable().describe('Display label for non-current inventory, e.g. \'Inactive / Removed from current inventory\'.'),
+  "inventoryStatusReason": zod.string().nullable(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
 })

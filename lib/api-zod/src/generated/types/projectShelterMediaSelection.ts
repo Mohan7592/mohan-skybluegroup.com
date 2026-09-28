@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { CampaignGeographyStatus } from './campaignGeographyStatus';
+import type { CurrentInventoryStatus } from './currentInventoryStatus';
 import type { ProjectShelterMediaSelectionStatus } from './projectShelterMediaSelectionStatus';
 
 export interface ProjectShelterMediaSelection {
@@ -38,4 +39,12 @@ export interface ProjectShelterMediaSelection {
   campaignStart: Date | null;
   /** @nullable */
   campaignEnd: Date | null;
+  inventoryStatus: CurrentInventoryStatus;
+  /**
+     * Display label for non-current inventory, e.g. 'Inactive / Removed from current inventory'.
+     * @nullable
+     */
+  inventoryStatusLabel: string | null;
+  /** @nullable */
+  inventoryStatusReason: string | null;
 }

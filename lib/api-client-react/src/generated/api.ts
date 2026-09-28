@@ -4422,7 +4422,7 @@ return customFetch<ProjectInventorySelection>(getSetProjectInventorySelectionUrl
 
 export const getSetProjectInventorySelectionMutationKey = () => ['setProjectInventorySelection'] as const;
 
-export const getSetProjectInventorySelectionMutationOptions = <TError = ErrorType<void>,
+export const getSetProjectInventorySelectionMutationOptions = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectInventorySelection>>, TError,SetProjectInventorySelectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setProjectInventorySelection>>, TError,SetProjectInventorySelectionMutationVariables, TContext> => {
 
@@ -4451,13 +4451,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetProjectInventorySelectionMutationResult = NonNullable<Awaited<ReturnType<typeof setProjectInventorySelection>>>
     export type SetProjectInventorySelectionMutationBody = BodyType<ProjectInventorySelectionInput>
-    export type SetProjectInventorySelectionMutationError = ErrorType<void>
+    export type SetProjectInventorySelectionMutationError = ErrorType<void | ApiError>
     export type SetProjectInventorySelectionMutationVariables = {projectId: string;assetId: string;data: BodyType<ProjectInventorySelectionInput>}
 
     /**
  * @summary Add or update an asset selection for a project
  */
-export const useSetProjectInventorySelection = <TError = ErrorType<void>,
+export const useSetProjectInventorySelection = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectInventorySelection>>, TError,SetProjectInventorySelectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setProjectInventorySelection>>,
@@ -4591,7 +4591,7 @@ return customFetch<ProjectInventorySelection>(getSetProjectInventoryUnitSelectio
 
 export const getSetProjectInventoryUnitSelectionMutationKey = () => ['setProjectInventoryUnitSelection'] as const;
 
-export const getSetProjectInventoryUnitSelectionMutationOptions = <TError = ErrorType<void>,
+export const getSetProjectInventoryUnitSelectionMutationOptions = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectInventoryUnitSelection>>, TError,SetProjectInventoryUnitSelectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof setProjectInventoryUnitSelection>>, TError,SetProjectInventoryUnitSelectionMutationVariables, TContext> => {
 
@@ -4620,13 +4620,13 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type SetProjectInventoryUnitSelectionMutationResult = NonNullable<Awaited<ReturnType<typeof setProjectInventoryUnitSelection>>>
     export type SetProjectInventoryUnitSelectionMutationBody = BodyType<ProjectInventorySelectionInput>
-    export type SetProjectInventoryUnitSelectionMutationError = ErrorType<void>
+    export type SetProjectInventoryUnitSelectionMutationError = ErrorType<void | ApiError>
     export type SetProjectInventoryUnitSelectionMutationVariables = {projectId: string;assetId: string;unitId: string;data: BodyType<ProjectInventorySelectionInput>}
 
     /**
  * @summary Add or update one independently selectable media unit
  */
-export const useSetProjectInventoryUnitSelection = <TError = ErrorType<void>,
+export const useSetProjectInventoryUnitSelection = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setProjectInventoryUnitSelection>>, TError,SetProjectInventoryUnitSelectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof setProjectInventoryUnitSelection>>,

@@ -21,12 +21,14 @@ test("media plan excludes manual bus/other inventory and separates rejected shel
       status: "selected",
       inventoryMediaUnitId: "unit-top",
       mediaUnitType: "TOP_PANEL",
+      inventoryStatus: "CURRENT",
     },
     {
       sourceFamily: "BUS_SHELTER",
       status: "rejected",
       inventoryMediaUnitId: "unit-mupi",
       mediaUnitType: "MUPI",
+      inventoryStatus: "CURRENT",
     },
     {
       sourceFamily: "BUS",
@@ -128,11 +130,15 @@ test("media-plan contract parses geography annotations and shelter area evidence
     availabilityStatus: null,
     campaignStart: null,
     campaignEnd: null,
+    inventoryStatus: "CURRENT",
+    inventoryStatusLabel: null,
+    inventoryStatusReason: null,
   };
   const response = GetProjectMediaPlanResponse.parse({
     projectId,
     shelterSelections: [shelterSelection],
     rejectedShelterSelections: [],
+    inactiveShelterSelections: [],
     busPlan: { projectId, selections: [busSelection], totalProposedBuses: 2 },
     totalProposedBuses: 2,
   });
